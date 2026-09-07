@@ -103,9 +103,11 @@ auto-corrected to that shape with a Logcat warning.
 
 ## Identity and user properties
 
-`setUser` and `clearUser` are opt-in — write them only when the developer has agreed to link
-analytics to real user ids (the `pubky-pulse-instrument` step-4 gate asks), because they
-change what the Play data safety form declares. Everything below works on the anonymous id.
+`setUser` is opt-in — write it only when the developer has agreed to link analytics to real
+user ids, as the Identity section of this skill's `SKILL.md` sets out, because it changes
+what the Play data safety form declares. `clearUser` is never gated: it is the call that
+removes a link, and the identifier it clears survives relaunch until it runs. Everything
+below works on the anonymous id.
 
 ```kotlin
 public fun setUser(identifier: String)

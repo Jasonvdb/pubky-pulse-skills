@@ -104,9 +104,9 @@ typo becomes its own step.
 
 ## Identity and user properties
 
-`setUser` and `clearUser` are opt-in — write them only when the developer has agreed to link
-analytics to real user ids (the `pubky-pulse-instrument` step-4 gate asks). Everything below
-works on the anonymous id without them.
+`setUser` is opt-in — write it only when the developer has agreed to link analytics to real
+user ids, as the Identity section of this skill's `SKILL.md` sets out. `clearUser` is never
+gated: it is the call that removes a link. Everything below works on the anonymous id.
 
 ```ts
 Pulse.setUser(identifier: string): Promise<void>

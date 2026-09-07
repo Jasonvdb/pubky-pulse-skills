@@ -200,10 +200,14 @@ Default: **do not link.** Write the identity call commented out at the exact cal
 with a one-line `// TODO(pulse): ...` marker and nothing else — no commented
 scaffolding, no disabled flag. On Node that is one commented
 `scope = scope.withUser(...)` line in the auth middleware, with the `withSession` line
-beside it instrumented for real. The gate covers exactly `Pulse.setUser` and
-`Pulse.clearUser` (web, Swift, Android) and `Pulse.withUser` (Node);
+beside it instrumented for real. The gate covers exactly `Pulse.setUser` (web, Swift,
+Android) and `Pulse.withUser` (Node). `Pulse.clearUser` is never gated: it is the call
+that removes a link rather than creating one, so wire it on logout, on a shared device,
+and when moving an app off identified analytics — on Swift and Android an identifier a
+previous `setUser` stored outlives the process and keeps linking events until it runs.
 `setUserProperties` attaches to whichever id is in play, so it follows the answer
-rather than being gated on its own.
+rather than being gated on its own. Each SDK skill repeats this question when it is
+invoked directly for one surface and nobody handed it an answer.
 
 Everything else has a default: infer it, note the assumption, keep going. Then print
 the plan — surfaces, apps to create, the per-surface tables, the metrics and funnels —
