@@ -380,6 +380,18 @@ a naming convention, stay consistent with it.
 
 ## Identity
 
+Identity is opt-in. Events carry an anonymous id (`pulse_anon_*`) per device until `setUser`
+runs, so unique-user counts and funnels already work without it. Write `setUser` only when the
+developer has explicitly agreed to link analytics to real user ids — the answer is what the
+Play data safety form declares. Use the answer the `pubky-pulse-instrument` step-4 gate
+supplies, and when none was supplied, this skill having been invoked directly for the Android
+surface, put the same question to the developer yourself — as selectable options in your
+harness's structured question tool (`AskUserQuestion` in Claude Code, plain text if it has
+none), staying anonymous recommended first. With no answer, write it commented out at the
+callsite with a one-line `// TODO(pulse): ...` marker and nothing else. `clearUser` is never
+gated: it creates no link. It removes none either — a bare `clearUser()` restores the previous
+anonymous id, which the server resolves back to the claimed account; see the API reference.
+
 ```kotlin
 Pulse.setUser(user.id)                       // after login; claims the anonymous history
 Pulse.setUserProperties(mapOf("plan" to "premium"))
@@ -387,9 +399,8 @@ Pulse.clearUser()                            // on logout
 Pulse.clearUser(newAnonymousId = true)       // shared device: mint a fresh anonymous id
 ```
 
-`setUser` is synchronous and safe to call before `configure` — the id is stashed and
-applied when configuration runs. Never pass an email or another personal identifier;
-use the app's own opaque id.
+`setUser` is synchronous and safe before `configure`; the id is stashed and applied when
+configuration runs. Never pass an email or another personal identifier — use an opaque id.
 
 ## Metrics
 

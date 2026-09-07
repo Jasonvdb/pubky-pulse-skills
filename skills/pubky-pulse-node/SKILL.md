@@ -265,7 +265,7 @@ handlers or server actions, or a serverless handler — each has its own placeme
 
 | Call | Effect |
 |---|---|
-| `Pulse.withUser(id)` | every event from the returned scope carries `user_id` |
+| `Pulse.withUser(id)` | every event from the returned scope carries `user_id`; opt-in, see Funnels |
 | `Pulse.withSession(uuid)` | overrides the process-wide session id |
 | `scope.withUser(...).withSession(...)` | chains in either order; scopes are immutable |
 | `Pulse.info(msg, attrs, { sessionId })` | per-call override, the highest precedence |
@@ -406,11 +406,19 @@ const pulse = Pulse.withUser(userId);
 pulse.step("checkout-payment");
 ```
 
-Events with no `user_id` are excluded from funnel analytics entirely, so a bare
-`Pulse.step(...)` from the global logger is silently dropped from every funnel it should
-have fed. This is the single most common backend funnel mistake. Backend steps pair with
-browser steps under the same user id — a webhook confirming a payment completes a funnel the
-browser started.
+Events with no `user_id` are excluded from funnel analytics entirely, so a bare `Pulse.step(...)`
+from the global logger is silently dropped — the most common backend funnel mistake. Backend and
+browser steps pair under one user id: a webhook completes a funnel the browser started.
+
+`withUser` is opt-in, and Node is the asymmetric surface: with no backend anonymous id,
+declining identity means backend funnel steps never register at all — say so before the
+developer decides. Use the answer the `pubky-pulse-instrument` step-4 gate supplies; when none
+was supplied, this skill having been invoked directly for the backend, put the same question
+to the developer yourself, as selectable options in your harness's structured question tool
+(`AskUserQuestion` in Claude Code, plain text if it has none) with staying anonymous first.
+With no answer, write the `withUser` line commented out with a one-line `// TODO(pulse): ...`
+marker, and instrument `Pulse.withSession(...)` from the client's `X-Pulse-Session-Id` header
+for real beside it — that needs no consent and keeps the whole browser-to-backend trace.
 
 ## Feedback
 
@@ -477,7 +485,7 @@ one-shot script needs `await Pulse.flush()` before it exits).
 
 - **`op.fail` takes a string here.** `op.fail(err.message)` or `op.fail(String(err))`; the
   web SDK's `fail(err: unknown)` signature does not apply.
-- **Global `Pulse.step()` is excluded from every funnel.** Funnels need a `user_id`.
+- **Global `Pulse.step()` is excluded from every funnel.** Only opt-in `withUser` sets one.
 - **One session per process without `withSession`.** Forward `X-Pulse-Session-Id`.
 - **A non-UUID session id is ignored silently.** Safe to forward, invisible when wrong —
   `debug: true` is how you find out.

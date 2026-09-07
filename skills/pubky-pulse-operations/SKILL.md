@@ -278,8 +278,12 @@ between releases. `pubky-pulse:list-metric-events` drills into single operations
 distinct users independently, right for non-linear flows. `mode: "closed"` requires the
 steps in order per user with strict timestamp ordering, right for a linear checkout.
 Both group users by `user_id`, so **events with no `user_id` are excluded entirely** —
-the usual cause of an empty backend funnel, where the Node SDK needs
-`Pulse.withUser(id).step(...)`. `group_by` is only `environment` or `app_version`.
+the usual cause of an empty backend funnel, which `Pulse.withUser(id).step(...)` fixes
+only where identity linking was opted into (the gate in `pubky-pulse-instrument`).
+Anonymous-only, an empty backend funnel is the correct outcome: `Pulse.withSession(...)`,
+driven by the client's `X-Pulse-Session-Id` header, is what ties backend events to a
+browser session without identifying anyone. `group_by` is only `environment` or
+`app_version`.
 
 **Trends.** `pubky-pulse:query-stats-bucketed` reads pre-aggregated rollups instead of
 rescanning raw events: `kind` is `events`, `users`, `sessions`, `metric_completions`,
@@ -395,7 +399,9 @@ or to confirm a parameter name instead of guessing.
 15. `screen_name` is prefix-matched in `query-events` but exactly matched in a funnel
     step filter. The same string behaves differently in the two places.
 16. Funnels exclude events with no `user_id` in both modes. Backend steps need
-    `Pulse.withUser(id).step(...)` or the funnel stays empty.
+    `Pulse.withUser(id).step(...)`, which exists only where identity linking was opted
+    into; anonymous-only, an empty backend funnel is expected and `Pulse.withSession(...)`
+    correlation answers the question instead.
 17. `data_mode` defaults to `production`. Anything a developer just did locally is
     `development` data and invisible until you ask for it.
 18. `project_id` and `team_id` are mutually exclusive on `list-metrics`, `list-funnels`,

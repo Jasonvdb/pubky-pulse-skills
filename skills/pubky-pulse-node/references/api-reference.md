@@ -64,6 +64,10 @@ Pulse.withUser(userId: string): ScopedPulse
 Pulse.withSession(sessionId: string): ScopedPulse
 ```
 
+`withUser` is opt-in — write it only once the developer has agreed to link analytics to real
+user ids, as the Funnels section of this skill's `SKILL.md` sets out. `withSession` needs no
+such consent.
+
 Scopes are immutable and chain in either order:
 `Pulse.withUser(u).withSession(s)` equals `Pulse.withSession(s).withUser(u)`. Session
 precedence is per-call `options.sessionId` > `withSession(...)` > the session `configure()`

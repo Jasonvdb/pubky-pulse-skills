@@ -238,6 +238,20 @@ History API, set `trackPageViews: false` and drive `trackScreen` from the route 
 
 ## Identity
 
+Identity is opt-in. Events carry an anonymous id (`pulse_anon_*`) until `setUser` runs, so
+unique-user counts, per-user timelines and both funnel modes already work without it. Write
+`setUser` only when the developer has explicitly agreed to link analytics to real user ids:
+use the answer the `pubky-pulse-instrument` step-4 gate supplies, and when none was supplied,
+this skill having been invoked directly for the web surface, put the same question to the
+developer yourself — as selectable options in your harness's structured question tool
+(`AskUserQuestion` in Claude Code, plain text if it has none), staying anonymous recommended
+first. With no answer, write it commented out at the callsite with a one-line
+`// TODO(pulse): ...` marker and nothing else. `clearUser` is never gated: it creates no link,
+so an agent may always write it. It removes none either — a bare `clearUser()` restores the
+previous anonymous id, which the server resolves straight back to the account that claimed it,
+so only `Pulse.clearUser({ newAnonymousId: true })` separates future activity, and neither form
+unclaims events that are already attributed.
+
 ```ts
 void Pulse.setUser(user.id);
 ```

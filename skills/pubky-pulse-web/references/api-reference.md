@@ -104,6 +104,13 @@ typo becomes its own step.
 
 ## Identity and user properties
 
+`setUser` is opt-in — write it only when the developer has agreed to link analytics to real
+user ids, as the Identity section of this skill's `SKILL.md` sets out. `clearUser` is never
+gated, because it creates no link — but it removes none either: a bare `clearUser()` returns
+to the previous anonymous id, which the server still resolves to the account that claimed it,
+so only `{ newAnonymousId: true }` separates future activity, and events already claimed stay
+claimed. Everything below works on the anonymous id.
+
 ```ts
 Pulse.setUser(identifier: string): Promise<void>
 Pulse.clearUser(options?: { newAnonymousId?: boolean }): void

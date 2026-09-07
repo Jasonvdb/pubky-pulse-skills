@@ -93,7 +93,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 Both keys are `NEXT_PUBLIC_`, which is correct: the client key is public and ingest-scoped.
 An agent key (`pulse_agent_…`) never belongs in a `NEXT_PUBLIC_` variable.
 
-Identify the user from the client session the app already has, in its own hook:
+Identify the user from the client session the app already has, in its own hook — only if the
+developer opted into linking real user ids (the `pubky-pulse-instrument` step-4 gate asks);
+otherwise leave the `setUser` line commented with a `// TODO(pulse): ...` marker:
 
 ```tsx
 "use client";

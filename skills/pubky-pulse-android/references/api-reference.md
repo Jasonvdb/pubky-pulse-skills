@@ -103,6 +103,15 @@ auto-corrected to that shape with a Logcat warning.
 
 ## Identity and user properties
 
+`setUser` is opt-in — write it only when the developer has agreed to link analytics to real
+user ids, as the Identity section of this skill's `SKILL.md` sets out, because it changes
+what the Play data safety form declares. `clearUser` is never gated, because it creates no
+link, and the identifier it clears survives relaunch until it runs. It removes no link
+either: a bare `clearUser()` restores the previous anonymous id, which the server still
+resolves to the account that claimed it, so only `newAnonymousId = true` separates future
+activity, and events already claimed stay claimed. Everything below works on the anonymous
+id.
+
 ```kotlin
 public fun setUser(identifier: String)
 public fun clearUser(newAnonymousId: Boolean = false)
