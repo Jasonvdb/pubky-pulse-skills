@@ -231,7 +231,8 @@ skills/<name>/
 └── evals/        # triggers.json: queries that must and must not load this skill
 ```
 
-Two checks run over the repo, and CI runs both on every push and pull request:
+Three checks run over the repo, and CI runs them on every push and pull request (the
+last one weekly as well, so upstream tool renames surface without a push here):
 
 ```sh
 # manifests, frontmatter, budgets, banned words, MCP tool names, references, evals, scripts
@@ -240,6 +241,9 @@ node scripts/lint-skills.mjs
 # conformance with the Agent Skills spec — one directory per invocation
 npx --yes skills-ref validate skills/pubky-pulse-web/
 for s in skills/*/; do npx --yes skills-ref validate "$s" || exit 1; done
+
+# scripts/mcp-tools.json matches the tools the server registers
+node scripts/check-mcp-tools.mjs --server ../pubky-pulse
 ```
 
 The two bundled scripts are zero-dependency and self-documenting:

@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
 
 jobs:
   lint:
@@ -25,3 +27,23 @@ jobs:
           for skill in skills/*/; do
             npx --yes skills-ref validate "$skill"
           done
+
+  mcp-tools:
+    name: Check MCP tool list against the server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Jasonvdb/pubky-pulse
+          path: .upstream/pubky-pulse
+          sparse-checkout: apps/server/src/mcp/tools
+          sparse-checkout-cone-mode: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Compare scripts/mcp-tools.json with the registered tools
+        run: node scripts/check-mcp-tools.mjs --server .upstream/pubky-pulse
