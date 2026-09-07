@@ -85,7 +85,8 @@ still has to be created once the server is connected.
 - [ ] 1. Detect every surface in the repository
 - [ ] 2. Audit what is already there, and take a baseline error-coverage count
 - [ ] 3. Draft the tracking plan — events, metrics, funnels and error rows per surface
-- [ ] 4. Ambiguity gate: ask only what has no defensible default, then print the plan
+- [ ] 4. Ambiguity gate: always ask about identity, plus whatever else has no
+      defensible default, then print the plan
 - [ ] 5. Create the project, apps, metrics and funnels over MCP
 - [ ] 6. Store the keys and settle the `appVersion` source
 - [ ] 7. Instrument each surface by loading its sibling skill
@@ -170,8 +171,8 @@ the blank table plus a fully worked web-and-backend example to pattern-match aga
 
 ## 4. Ambiguity gate
 
-Ask only when the answer changes what gets created and no reading of the repository
-settles it. There are four such questions:
+Ask questions 1–4 only when the answer changes what gets created and no reading of the
+repository settles it. Ask question 5 every run: the repository can never settle it.
 
 1. **Product name**, when `package.json`, the app display name and the README disagree
    or are placeholders. It becomes the project name and the prefix of every app name.
@@ -181,6 +182,28 @@ settles it. There are four such questions:
    than one plausible match for this product.
 4. **A surface to skip**, when one exists but looks abandoned or out of scope — an
    unmaintained example app, a second frontend nobody deploys.
+5. **Whether to link real user identifiers.** Every SDK is anonymous by default: the
+   client SDKs mint `pulse_anon_<uuid>` per browser or device and that id fills
+   `user_id`. `Pulse.setUser(id)` on web, Swift and Android, and `Pulse.withUser(id)`
+   on Node, put the product's own identifier there instead, and on the client SDKs
+   `setUser` also claims that browser's anonymous history server-side. It decides what
+   the app declares in an App Store privacy manifest or a Play data safety form, and
+   what a data-subject request has to return, so it is the developer's call, not yours.
+   Ask it in the same batch as whichever of 1–4 apply, so it costs no extra round-trip.
+
+| Surface | Still works without identity | Cost of declining |
+|---|---|---|
+| Web, Swift, Android | unique-user counts, per-user timelines and both funnel modes — the anonymous id already fills `user_id` | those counts are of browsers and devices, so one person on two devices counts twice |
+| Node | `withSession`, driven by the client's `X-Pulse-Session-Id` header, still gives the full browser-to-backend trace and needs no consent | there is no backend anonymous id: an unscoped event carries no `user_id` at all and is excluded from funnel analytics, so backend funnel steps never register |
+
+Default: **do not link.** Write the identity call commented out at the exact callsite
+with a one-line `// TODO(pulse): ...` marker and nothing else — no commented
+scaffolding, no disabled flag. On Node that is one commented
+`scope = scope.withUser(...)` line in the auth middleware, with the `withSession` line
+beside it instrumented for real. The gate covers exactly `Pulse.setUser` and
+`Pulse.clearUser` (web, Swift, Android) and `Pulse.withUser` (Node);
+`setUserProperties` attaches to whichever id is in play, so it follows the answer
+rather than being gated on its own.
 
 Everything else has a default: infer it, note the assumption, keep going. Then print
 the plan — surfaces, apps to create, the per-surface tables, the metrics and funnels —
@@ -261,6 +284,8 @@ give it that surface's plan rows as its input. The handoff is:
 
 - the ingest endpoint, the app's `client_secret`, and its `bundle_id`
 - the `appVersion` source decided in step 6
+- the identity answer from step 4 — link real identifiers, or leave the identity call
+  commented out at its callsite
 - the Event, Metric, Funnel step and Error rows for that surface, with the
   `Where (file:symbol)` column intact
 - for a web-plus-backend repository: `propagateSessionTo` on the browser side and the
@@ -347,6 +372,9 @@ decision tree that separates them.
 **Error coverage** 41 handling sites, 41 reporting (baseline: 6 of 41).
 Remaining uninstrumented: none | `<file:line>` — rethrown to `<handler>`.
 
+**Identity** linked, `Pulse.setUser` after sign-in | anonymous only — call left
+commented at `src/auth/session.ts:onSignIn`.
+
 **Verified** `sdk:session_started` and 14 planned events in development data mode;
 funnel `checkout` shows 4 of 4 steps; metric `process-payment` shows 3 completions;
 a deliberate failure appeared at `level: "error"`.
@@ -399,7 +427,9 @@ a naming convention, stay consistent with it.
 - **Filter funnel steps on `step_name`, not `screen_name`.** A screen filter is an
   exact match, so a path with a variable segment never matches it.
 - **Backend funnel steps need `withUser`.** Events with no `user_id` are excluded from
-  funnel analytics entirely, and nothing warns you.
+  funnel analytics entirely, and nothing warns you. That is the fix once identity is
+  opted in at the step 4 gate; declined, an empty backend funnel is the expected
+  outcome and `withSession` correlation is what answers the question instead.
 - **`op.fail` differs by SDK.** The web SDK takes the error value; Node, Swift and
   Android take a `String`. Do not copy a snippet across surfaces.
 - **`console.error` is not captured** on web, and neither are React error boundaries,

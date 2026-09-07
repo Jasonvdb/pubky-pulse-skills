@@ -52,7 +52,7 @@ question is already in the row.
 | Request handling | one `request_handled` per response (`method`, `route`, `status_code`, `duration_ms`); `warn` at 5xx so a bad deploy stands out without becoming an issue | — |
 | Request failure | `request_failed` from the framework error handler, with the error object | — |
 | Authentication | `auth_succeeded` (`method`), `auth_failed` (`reason`) — never the credential | metric when an identity provider is called |
-| Business transactions | `order_placed`, `subscription_renewed`, `refund_issued` with ids and amounts | funnel step, always from `withUser` |
+| Business transactions | `order_placed`, `subscription_renewed`, `refund_issued` with ids and amounts | funnel step from `withUser`, so only when identity is opted in |
 | Outbound calls | `upstream_call_failed` (`service`, `status_code`, `attempt`) — one event per operation, not per retry | metric per upstream |
 | Webhooks received | `webhook_received` (`source`, `type`), `webhook_rejected` (`reason`) | — |
 | Queue and job workers | `job_completed` (`job`, `processed`, `failed`, `duration_ms`), `job_failed` | metric named for the job |
@@ -72,8 +72,16 @@ question is already in the row.
 | Outcome events | the success branch of the handler that did the work | after the work, before the response is sent | the success branch, on the main actor or off it | the success branch, inside the coroutine |
 | Errors | `catch`, error boundary, router error element | framework error handler, worker body | `catch`, `Result` failure, `Task` body | `catch`, `onFailure`, `CoroutineExceptionHandler` |
 | Metrics | around the async call, terminal call on every exit | on the scoped logger, so phases carry the user | around the `async` function body | around the suspend function body |
-| Funnel steps | at the UI progression point | from `withUser(id)`, never the global logger | at the UI progression point | at the UI progression point |
+| Funnel steps | at the UI progression point | from `withUser(id)`, never the global logger, so only once identity is opted in | at the UI progression point | at the UI progression point |
 | Identity | `void Pulse.setUser(id)` after sign-in | `withUser(id)` per request, from the auth layer | `Pulse.setUser(id)` after sign-in | `Pulse.setUser(id)` after sign-in |
+
+The Identity row says where the call goes, not whether to make it. Linking a real user
+identifier is the developer's opt-in, asked at step 4's ambiguity gate; declined, those
+same callsites carry the call commented out behind a `// TODO(pulse):` marker. On web,
+Swift and Android the anonymous `pulse_anon_*` id keeps filling `user_id`, so events,
+timelines and funnels all still work. Node has no anonymous id, so its funnel steps
+register only once identity is opted in. `withSession` from the `X-Pulse-Session-Id`
+header is outside the gate and always wired.
 
 ## The skip list
 

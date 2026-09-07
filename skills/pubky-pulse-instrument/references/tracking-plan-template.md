@@ -12,6 +12,7 @@ writing any code — a row you cannot place is a row you have not thought throug
 ### <Project> <Platform> — app `<Project> <Platform>` (platform `<web|backend|apple|android>`)
 
 Bundle id: `<value or —>` · Origins: `<list or —>` · App version from: `<source>`
+Identity: `<linked | anonymous only>`
 
 | Kind | Name | Where (file:symbol) | Attributes | Server definition |
 |---|---|---|---|---|
@@ -23,6 +24,12 @@ Bundle id: `<value or —>` · Origins: `<list or —>` · App version from: `<s
 Funnels: `<slug>` — `<step>` → `<step>` → `<step>`
 Caps: <n>/25 events · <n>/8 metrics · <n>/3 funnels
 ```
+
+`Identity` carries the answer to the step 4 gate, so the printed plan shows it and not
+only the final report. `anonymous only` means every identity call is written commented
+out at its callsite. Web, Swift and Android plans are otherwise unchanged, because the
+anonymous id keeps filling `user_id`; a backend Funnel step row records nothing until
+identity is opted in, so say that in the row instead of leaving it looking live.
 
 ## Worked example: Lofi, a Next.js app with route handlers
 
@@ -36,6 +43,7 @@ Project `Lofi`, slug `lofi`.
 
 Bundle id: `app.lofi.com` · Origins: `https://app.lofi.com`, `http://localhost:3000` ·
 App version from: `package.json` `version`, injected by `next.config.js` `env`
+Identity: linked — the developer opted in at the step 4 gate
 
 | Kind | Name | Where (file:symbol) | Attributes | Server definition |
 |---|---|---|---|---|
@@ -68,12 +76,13 @@ Funnels: `checkout` — `checkout-cart` → `checkout-address` → `checkout-pay
 Caps: 8/25 events · 2/8 metrics · 2/3 funnels
 
 Also on this surface: `propagateSessionTo: ["/api"]` so the browser session id reaches
-the route handlers, and `void Pulse.setUser(user.id)` after sign-in, never awaited on
-the sign-in path.
+the route handlers, and — identity being linked here — `void Pulse.setUser(user.id)`
+after sign-in, never awaited on the sign-in path.
 
 ### Lofi Backend — app `Lofi Backend` (platform `backend`)
 
 Bundle id: — · Origins: — · App version from: `process.env.APP_VERSION`
+Identity: linked — same answer, so `withUser` is available to the backend steps
 
 | Kind | Name | Where (file:symbol) | Attributes | Server definition |
 |---|---|---|---|---|
@@ -98,4 +107,6 @@ Caps: 6/25 events · 2/8 metrics · 0 new funnels
 
 Note the shared step name. The funnel is project-scoped, so one definition spans both
 apps; the backend emits its step through `Pulse.withUser(userId).step(...)`, because
-an event with no `user_id` is excluded from funnel analytics entirely.
+an event with no `user_id` is excluded from funnel analytics entirely. That row exists
+only because this plan's header says identity is linked; under `anonymous only` the
+browser still completes the funnel through `checkout-confirmed` on the web surface.
