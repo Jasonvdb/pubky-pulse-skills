@@ -3,10 +3,10 @@ name: pubky-pulse-operations
 description: >-
   Drives the Pubky Pulse MCP server directly: projects, apps and allowed origins, metric and
   funnel definitions, event, metric, funnel and stats queries, feedback, questionnaires,
-  attachments, background jobs, import keys and audit logs. Use when asked to create or
-  update a Pubky Pulse project, app, metric or funnel, to query analytics or read feedback
-  and survey results, or to connect the MCP server and check what a key can do. Not for
-  writing SDK code into a repo (see pubky-pulse-instrument) or triaging error issues (see
+  attachments, background jobs, import keys and audit logs. Use when asked to create or update
+  a Pubky Pulse project, app, metric or funnel, to query analytics or read feedback and survey
+  results, or to connect the MCP server and check what a key can do. Not for instrumenting a
+  repository or writing SDK code (see pubky-pulse-instrument) or triaging error issues (see
   pubky-pulse-investigate-issues).
 license: MIT
 compatibility: >-

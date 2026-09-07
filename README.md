@@ -15,7 +15,18 @@ OpenCode, Gemini CLI, and others. The repo doubles as a Claude Code plugin marke
 
 ## Skills
 
-<!-- TODO: table of the seven skills — name, what it does, when it triggers. -->
+| Skill | What it does | Triggers on |
+|---|---|---|
+| **`pubky-pulse-instrument`** *(start here)* | Instruments a codebase end to end: detects the web, backend, iOS and Android surfaces, drafts a tracking plan of events, metrics and funnels, creates the project and apps over MCP, wires each SDK, covers every error path, and verifies data arrives. | "add analytics", "add error tracking", "instrument this app", "wire up Pubky Pulse" |
+| `pubky-pulse-web` | Adds the web SDK to a browser app — React, Next.js, Vue, Svelte or plain JavaScript: configuration, catching every unhandled and caught error, screens, events, metrics, funnel steps, identity, feedback, and propagating the session to the backend. | browser instrumentation, frontend error tracking |
+| `pubky-pulse-node` | Adds the Node SDK to a backend — Express, Fastify, Hono, Nest, tRPC, serverless handlers, workers and cron jobs: configuration, the per-request middleware the SDK does not ship, user and session scoping, lifecycle metrics, graceful shutdown. | instrumenting an API or a worker |
+| `pubky-pulse-swift` | Adds the Swift SDK to an iOS, iPadOS, macOS or watchOS app: package setup, configuration, screen tracking, and the error capture the SDK does not do for you — there is no automatic crash capture — plus feedback, questionnaires and the privacy manifest. | instrumenting Apple app code |
+| `pubky-pulse-android` | Adds the Android SDK to a Kotlin or Compose app: the Gradle dependency, configuration in `Application.onCreate`, screen tracking, coroutine, `runCatching`, WorkManager and OkHttp error capture, plus feedback, questionnaires and Play data safety. | instrumenting Android code |
+| `pubky-pulse-investigate-issues` | Triages issues: inventories open and regressed ones, claims an issue, reads occurrence breadcrumbs across sessions and apps, finds the pattern behind them, then fixes, snoozes, merges or resolves each at a real fix version. | "what is broken in production", an error spike, working the issue inbox |
+| `pubky-pulse-operations` | Drives the MCP server directly: projects, apps and allowed origins, metric and funnel definitions, event, metric, funnel and stats queries, feedback, questionnaires, attachments, background jobs, import keys and audit logs. | one-off queries, creating or editing definitions, connecting the MCP server |
+
+`pubky-pulse-instrument` loads the four SDK skills itself, so one prompt covers a whole
+repository. Each SDK skill also stands alone when only one surface needs wiring up.
 
 ## Prerequisites
 
@@ -127,11 +138,68 @@ Pull updates with `gh skill update --all`.
 
 ## Example: instrument a codebase in one prompt
 
-<!-- TODO: the one-shot prompt and a sketch of what the agent does with it. -->
+Point your agent at the repository and ask for the whole thing at once:
 
-## Conventions
+```text
+Instrument this repo with Pubky Pulse: web app and backend, catch every error, define
+metrics and funnels, create everything in Pulse and verify events arrive.
+```
 
-<!-- TODO: naming rules, event/metric/funnel choice, and where they come from. -->
+`pubky-pulse-instrument` takes it from there:
+
+1. **Detects the surfaces** from the manifests — a Next.js app with API routes is two
+   apps, web and backend, not one.
+2. **Audits the code** for the places worth instrumenting and for error paths that
+   currently report nothing.
+3. **Drafts a tracking plan** — events, metrics and funnels per surface, capped so the
+   plan stays readable, with error rows for every surface.
+4. **Creates the project and one app per surface** over MCP, sets the allowed origins
+   for the web app including the dev-server origin, creates every metric and funnel
+   definition, and puts each client key where that surface reads it from.
+5. **Writes the code** by loading `pubky-pulse-web`, `pubky-pulse-node`,
+   `pubky-pulse-swift` or `pubky-pulse-android` for each surface, covering every catch,
+   error boundary, rejected promise, failed job and non-2xx response.
+6. **Verifies** — builds or typechecks, re-checks that no error path is left
+   unreported, then queries the events back in development data mode and reports what
+   arrived and what did not.
+
+It decides rather than interviews: questions come only when a choice is genuinely
+ambiguous (the product name cannot be inferred, two similar projects already exist), and
+every question has a default it takes if no answer comes back.
+
+Two shorter ones, for the days after:
+
+```text
+What is broken in production? Work through the new Pubky Pulse issues and fix what you can.
+```
+
+```text
+How many users finished the onboarding funnel this week, and which step loses the most?
+```
+
+The first loads `pubky-pulse-investigate-issues`, the second `pubky-pulse-operations`.
+
+## Conventions the family enforces
+
+All seven skills name things the same way, so a codebase instrumented today still reads
+consistently after the next surface is added.
+
+| Thing | Rule | Example |
+|---|---|---|
+| Project | bare product name, no platform suffix | `Lofi` |
+| App | `<Project> <Platform>` | `Lofi Web`, `Lofi Backend`, `Lofi iOS`, `Lofi Android` |
+| Event message | snake_case, outcome-oriented, never interpolated | `checkout_completed` |
+| Metric slug | kebab-case, created on the server first | `process-payment` |
+| Funnel slug and step | kebab-case, created on the server first | `onboarding`, `onboarding-email` |
+| Screen name | native: PascalCase human name; web: URL path, tracked automatically | `Checkout`, `/checkout` |
+
+The rule of thumb behind the table: **hyphens = must exist on the server first,
+underscores = free-form event**. Event messages are the key errors are grouped by, so
+they stay stable templates and the variable data goes into attributes. Where a codebase
+already has its own convention, the skills follow that instead.
+
+The full table, along with the description budgets, banned words and lint rules every
+skill is written to, lives in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Updates
 
@@ -153,7 +221,61 @@ or `ref`/`sha` in a Claude Code marketplace source).
 
 ## Development
 
-<!-- TODO: repo layout, how to run the lint, and how to add or change a skill. -->
+Each skill is a directory of its own:
+
+```text
+skills/<name>/
+├── SKILL.md      # the skill: frontmatter, body, gotchas (≤500 lines)
+├── references/   # long material, one level deep, loaded on demand
+├── scripts/      # bundled scripts, executed rather than read
+└── evals/        # triggers.json: queries that must and must not load this skill
+```
+
+Two checks run over the repo, and CI runs both on every push and pull request:
+
+```sh
+# manifests, frontmatter, budgets, banned words, MCP tool names, references, evals, scripts
+node scripts/lint-skills.mjs
+
+# conformance with the Agent Skills spec — one directory per invocation
+npx --yes skills-ref validate skills/pubky-pulse-web/
+for s in skills/*/; do npx --yes skills-ref validate "$s" || exit 1; done
+```
+
+The two bundled scripts are zero-dependency and self-documenting:
+
+```sh
+skills/pubky-pulse-instrument/scripts/find-uninstrumented-catches.sh --help
+skills/pubky-pulse-operations/scripts/check-mcp-config.sh --help
+```
+
+Both print JSON on stdout and change nothing; the first also has a `--self-test` that
+runs its built-in fixtures.
+
+### Trigger evals
+
+A skill is only useful if it loads on the prompts people actually type, so every skill
+ships `evals/triggers.json` — queries that **should** load it, and near-miss queries that
+**should not**, because they belong to a sibling. There is no automated runner; check
+them by hand after changing a description:
+
+```sh
+/plugin marketplace add /absolute/path/to/pubky-pulse-skills
+/plugin install pubky-pulse-skills@pubky-pulse-skills
+/reload-plugins
+```
+
+Then run each query in a fresh, non-interactive session and read back which skill was
+invoked:
+
+```sh
+claude -p "<query from evals/triggers.json>" --output-format json --max-turns 2
+```
+
+Every `should` query must load that skill; every `should_not` query must load the sibling
+it belongs to, or no skill at all. Use a fresh session per query — a skill already in
+context is not a trigger. When two skills claim the same query, fix it by adding
+specificity to the boundary clause of each description, not by deleting the query.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the contract every skill is written to.
 

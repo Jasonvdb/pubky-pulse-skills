@@ -1,0 +1,26 @@
+{
+  "should": [
+    "what broke in production this week",
+    "what errors are our users hitting right now",
+    "go through the Pubky Pulse issue inbox and triage everything that is open",
+    "investigate Pubky Pulse issue 4821 and tell me the root cause",
+    "we had an error spike after the 2.4.0 release — find out what regressed",
+    "which crashes affect the most unique users, and can you fix the top one",
+    "claim the top open Pubky Pulse issue, find the pattern across its occurrences and resolve it",
+    "are any resolved Pubky Pulse issues regressing",
+    "read the occurrence breadcrumbs for this issue and work out what the user did before it failed",
+    "triage the open issues and snooze the ones that are not worth fixing"
+  ],
+  "should_not": [
+    "add error tracking to this repo",
+    "how many users signed up yesterday",
+    "create a metric for checkout latency",
+    "add Pulse error reporting to every catch block in this Swift app",
+    "list the feedback we got this month and mark the handled ones resolved",
+    "capture unhandled promise rejections in our React app",
+    "query the funnel conversion rate for onboarding last month",
+    "why is this unit test failing locally",
+    "search the GitHub repository for an existing bug report",
+    "review this pull request for correctness"
+  ]
+}

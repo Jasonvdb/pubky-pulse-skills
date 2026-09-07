@@ -1,13 +1,13 @@
 ---
 name: pubky-pulse-instrument
 description: >-
-  Instruments a codebase end to end with Pubky Pulse: detects the web, backend, iOS and
-  Android surfaces, drafts a tracking plan of events, metrics and funnels, creates the
-  project and apps over MCP, wires each SDK, covers every error path, and verifies data
-  arrives. Use when asked to add analytics or error tracking, to instrument an app, to wire
-  up Pubky Pulse, or to track events and conversion funnels — even if the user only says
-  "add Pulse to this repo". Not for triaging errors already collected (see
-  pubky-pulse-investigate-issues) or ad-hoc queries and admin (see pubky-pulse-operations).
+  Instruments a codebase end to end with Pubky Pulse: detects the web, backend, iOS and Android
+  surfaces, drafts a tracking plan of events, metrics and funnels, creates the project and apps
+  over MCP, wires each SDK, covers every error path, and verifies data arrives. Use when asked
+  to instrument a repository, or to add analytics or error tracking across it — even if the
+  user only says "add Pulse to this repo". Not for one named surface alone (see
+  pubky-pulse-web, pubky-pulse-node), errors already collected (see
+  pubky-pulse-investigate-issues), or queries and admin (see pubky-pulse-operations).
 license: MIT
 compatibility: >-
   Needs the pubky-pulse MCP server connected for the create and verify steps; the code

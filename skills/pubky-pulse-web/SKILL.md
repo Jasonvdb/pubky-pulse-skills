@@ -2,12 +2,12 @@
 name: pubky-pulse-web
 description: >-
   Adds the Pubky Pulse web SDK to a browser app — React, Next.js, Vue, Svelte, or plain
-  JavaScript. Covers configuration, catching every unhandled and caught error, screen
-  tracking, events, lifecycle metrics, funnel steps, user identity, feedback and
-  questionnaires, and propagating the session to the backend. Use when adding analytics or
-  frontend error tracking, or when a tracking plan needs browser instrumentation. Not for
-  server code (see pubky-pulse-node) or for planning what to track and creating the project
-  first (see pubky-pulse-instrument).
+  JavaScript. Covers configuration, catching every unhandled and caught error, screen tracking,
+  events, lifecycle metrics, funnel steps, user identity, feedback and questionnaires, and
+  propagating the session to the backend. Use when adding analytics or error tracking to
+  browser code, or when a tracking plan needs browser instrumentation. Not for server code (see
+  pubky-pulse-node) or for planning what to track and creating the project first (see
+  pubky-pulse-instrument).
 license: MIT
 compatibility: >-
   The code changes need no MCP server. The pubky-pulse MCP server is needed only to create

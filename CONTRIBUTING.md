@@ -65,6 +65,10 @@ Not for <X> (see <sibling>), <Y> (see <sibling>).
 - Refer to sibling skills **by name only** ("load `pubky-pulse-web`"), never by path.
 - Write MCP tools as `pubky-pulse:<tool>` and note once per skill that Claude Code
   exposes them as `mcp__pubky-pulse__<tool>`.
+- Every skill ships `evals/triggers.json`: at least eight queries that must load it,
+  and at least eight near-miss queries that must load a sibling instead. Re-check
+  them by hand whenever a description changes — the README's Development section
+  explains how to run one.
 
 ## Shared blocks — copy verbatim
 
@@ -179,11 +183,13 @@ useful without the server, so it stops there instead of continuing.
 
 ## Banned words
 
-`skills/**` must never contain (case-insensitive): `owlmetry`, `owl_client`,
-`revenuecat`, `search ads`, `app store connect`, `apns`, `push notification`,
-`attribution token`, `team invitation`, `integrations framework`. These name a
-different product or a feature this one does not have, and an agent that reads one
-will go looking for it.
+`skills/**` must never name a different observability product, or a feature this
+fork does not have: ad attribution, billing and subscription vendors, mobile push
+and device registration, app-review APIs, an integrations framework, team
+invitations. Each of those names something that is not there, and an agent that
+reads one goes looking for it. `BANNED_PATTERNS` in `scripts/lint-skills.mjs` is the
+canonical list, and is deliberately the only place in this repository where those
+words are spelled out.
 
 The bare word `CLI` is banned too, because the MCP server is the only agent
 interface here. A line naming a specific tool (`Codex CLI`, `Gemini CLI`,
@@ -210,8 +216,9 @@ Do not narrate removals ("X was removed") — simply do not mention what is not 
 6. Each referenced `references/*.md` exists, each file in `references/` is mentioned in
    `SKILL.md` on a line saying when to read it, and files over 100 lines start with
    `## Contents`.
-7. `evals/triggers.json`, when present, has at least eight `should` and eight
-   `should_not` queries. A skill with no evals file yet produces a warning.
+7. `evals/triggers.json` has at least eight `should` and eight `should_not`
+   queries. Every skill ships one; a missing file is only a warning, so CI does not
+   catch it and review has to.
 8. Every bundled `skills/*/scripts/*` is executable and exits 0 for `--help`.
 
 Failures print one per line and exit 1. Run it before opening a pull request; a

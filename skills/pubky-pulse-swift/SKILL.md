@@ -1,13 +1,13 @@
 ---
 name: pubky-pulse-swift
 description: >-
-  Adds the Pubky Pulse Swift SDK to an iOS, iPadOS, macOS or watchOS app. Covers Swift
-  Package Manager setup, configuration, screen tracking, and the error capture the SDK does
-  not do for you — there is no automatic crash capture, so every catch, Result and Task
-  boundary reports itself. Also events, metrics, funnels, identity, feedback, questionnaires
-  and privacy manifests. Use when adding analytics or error tracking to Apple app code. Not
-  for Kotlin (see pubky-pulse-android) or for planning what to track first (see
-  pubky-pulse-instrument).
+  Adds the Pubky Pulse Swift SDK to an iOS, iPadOS, macOS or watchOS app. Covers Swift Package
+  Manager setup, configuration, screens, and the error capture the SDK does not do — there is
+  no automatic crash capture, so every catch, Result and Task boundary reports itself. Also
+  events, metrics, funnels, identity, feedback, questionnaires and privacy manifests. Use when
+  adding analytics or error tracking to Apple app code. Not for Kotlin (see
+  pubky-pulse-android), crashes already collected (see pubky-pulse-investigate-issues), or
+  planning what to track (see pubky-pulse-instrument).
 license: MIT
 compatibility: >-
   The code changes need no MCP server. The pubky-pulse MCP server is needed only to create

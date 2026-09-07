@@ -1,0 +1,26 @@
+{
+  "should": [
+    "add the Pubky Pulse Node SDK to my Express API",
+    "add error tracking to my Fastify server",
+    "instrument this backend so I can see every failed request",
+    "write the per-request Pulse middleware for Express — the SDK does not ship one",
+    "add Pubky Pulse to a Lambda handler and make sure events flush before it freezes",
+    "track a payment operation with startOperation in our Node worker and record the failures",
+    "our funnel steps from the backend never show up — do they need a user id",
+    "wire Pulse into this Nest service including graceful shutdown on SIGTERM",
+    "add Pubky Pulse to our queue processor and cron jobs",
+    "scope Pulse events to the signed-in user and the browser session in our API"
+  ],
+  "should_not": [
+    "add Pulse to my React frontend",
+    "configure Pulse in a SwiftUI app",
+    "instrument this whole monorepo with Pubky Pulse",
+    "which backend errors are spiking today",
+    "create a backend app in Pubky Pulse and give me its client key",
+    "resolve the unhandled rejection issue at version 1.9.2",
+    "capture unhandled promise rejections in the browser",
+    "add rate limiting middleware to this Express app",
+    "why is my Postgres query slow",
+    "write a Dockerfile for this Node service"
+  ]
+}

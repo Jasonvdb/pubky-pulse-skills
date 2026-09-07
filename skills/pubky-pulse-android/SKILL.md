@@ -2,12 +2,12 @@
 name: pubky-pulse-android
 description: >-
   Adds the Pubky Pulse Android SDK to a Kotlin or Compose app. Covers the Gradle dependency,
-  configuration in Application.onCreate, screen tracking, and the error capture the SDK does
-  not do for you — no automatic crash or network capture, so coroutine handlers,
-  runCatching, WorkManager and an OkHttp interceptor carry it. Also events, metrics,
-  funnels, identity, feedback, questionnaires and Play data safety. Use when adding
-  analytics or error tracking to Android code. Not for Swift (see pubky-pulse-swift) or for
-  planning what to track first (see pubky-pulse-instrument).
+  Application.onCreate configuration, screens, and the error capture the SDK does not do — no
+  automatic crash or network capture, so coroutine handlers, runCatching and an OkHttp
+  interceptor carry it. Also events, metrics, funnels, identity, feedback, questionnaires and
+  Play data safety. Use when adding analytics or error tracking to Android code. Not for Swift
+  (see pubky-pulse-swift), crashes already collected (see pubky-pulse-investigate-issues), or
+  planning what to track (see pubky-pulse-instrument).
 license: MIT
 compatibility: >-
   The code changes need no MCP server. The pubky-pulse MCP server is needed only to create

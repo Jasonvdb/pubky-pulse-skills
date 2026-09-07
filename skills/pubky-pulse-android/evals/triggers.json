@@ -1,0 +1,26 @@
+{
+  "should": [
+    "add the Pubky Pulse Android SDK to my Kotlin app",
+    "add error tracking to this Jetpack Compose app",
+    "instrument this Android app so failures inside coroutines get reported",
+    "add the Pulse Gradle dependency and configure it in Application.onCreate",
+    "does Pulse capture Android crashes automatically, and what should I add if it does not",
+    "track screens with Modifier.pulseScreen in our Compose navigation",
+    "add an OkHttp interceptor that reports failed requests to Pubky Pulse",
+    "wire the Pulse feedback and questionnaire views into my Android settings screen",
+    "report failures from WorkManager workers and runCatching blocks to Pubky Pulse",
+    "fill in the Play data safety form for the Pubky Pulse Android SDK"
+  ],
+  "should_not": [
+    "add Pulse to my SwiftUI app",
+    "add the Pubky Pulse web SDK to my React app",
+    "add Pubky Pulse to our Fastify backend",
+    "instrument this whole product with Pubky Pulse — app and backend",
+    "what are the top Android errors this week",
+    "create the Android app in Pubky Pulse and read back its client key",
+    "resolve the Android crash issue at version 3.1.0",
+    "migrate this project from Groovy to the Kotlin Gradle DSL",
+    "fix this Compose recomposition performance problem",
+    "add a Room database to this Android project"
+  ]
+}
