@@ -201,10 +201,12 @@ with a one-line `// TODO(pulse): ...` marker and nothing else — no commented
 scaffolding, no disabled flag. On Node that is one commented
 `scope = scope.withUser(...)` line in the auth middleware, with the `withSession` line
 beside it instrumented for real. The gate covers exactly `Pulse.setUser` (web, Swift,
-Android) and `Pulse.withUser` (Node). `Pulse.clearUser` is never gated: it is the call
-that removes a link rather than creating one, so wire it on logout, on a shared device,
-and when moving an app off identified analytics — on Swift and Android an identifier a
-previous `setUser` stored outlives the process and keeps linking events until it runs.
+Android) and `Pulse.withUser` (Node). `Pulse.clearUser` is never gated: it creates no link,
+so wire it on logout — on Swift and Android an id a previous `setUser` stored otherwise
+outlives the process. It removes no link either, so it is not a privacy control: a bare
+`clearUser()` restores the previous anonymous id, which the server resolves straight back to
+the account that claimed it, so only a fresh anonymous id (`newAnonymousId`) separates future
+activity, and neither form unclaims events that are already attributed.
 `setUserProperties` attaches to whichever id is in play, so it follows the answer
 rather than being gated on its own. Each SDK skill repeats this question when it is
 invoked directly for one surface and nobody handed it an answer.

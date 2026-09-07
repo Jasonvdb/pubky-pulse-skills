@@ -389,8 +389,8 @@ surface, put the same question to the developer yourself — as selectable optio
 harness's structured question tool (`AskUserQuestion` in Claude Code, plain text if it has
 none), staying anonymous recommended first. With no answer, write it commented out at the
 callsite with a one-line `// TODO(pulse): ...` marker and nothing else. `clearUser` is never
-gated: it is the call that removes a link rather than creating one, and the identifier it
-clears otherwise persists across launches.
+gated: it creates no link. It removes none either — a bare `clearUser()` restores the previous
+anonymous id, which the server resolves back to the claimed account; see the API reference.
 
 ```kotlin
 Pulse.setUser(user.id)                       // after login; claims the anonymous history
