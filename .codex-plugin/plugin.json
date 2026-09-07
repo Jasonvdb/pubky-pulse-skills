@@ -1,0 +1,29 @@
+{
+  "name": "pubky-pulse-skills",
+  "version": "0.1.0",
+  "description": "Agent skills for instrumenting and operating Pubky Pulse.",
+  "author": {
+    "name": "Jason van den Berg"
+  },
+  "homepage": "https://github.com/Jasonvdb/pubky-pulse-skills",
+  "repository": "https://github.com/Jasonvdb/pubky-pulse-skills",
+  "license": "MIT",
+  "keywords": [
+    "agent-skills",
+    "pubky-pulse",
+    "observability",
+    "analytics",
+    "error-tracking",
+    "mcp",
+    "web",
+    "node",
+    "swift",
+    "android"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Pubky Pulse Skills",
+    "shortDescription": "Agent skills for instrumenting and operating Pubky Pulse",
+    "category": "Productivity"
+  }
+}

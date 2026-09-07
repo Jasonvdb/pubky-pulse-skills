@@ -1,0 +1,10 @@
+{
+  "name": "pubky-pulse-skills",
+  "description": "Agent skills for instrumenting and operating Pubky Pulse.",
+  "author": {
+    "name": "Jason van den Berg"
+  },
+  "homepage": "https://github.com/Jasonvdb/pubky-pulse-skills",
+  "repository": "https://github.com/Jasonvdb/pubky-pulse-skills",
+  "license": "MIT"
+}

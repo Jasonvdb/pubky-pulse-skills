@@ -1,0 +1,16 @@
+{
+  "name": "pubky-pulse-skills",
+  "interface": {
+    "displayName": "Pubky Pulse Skills"
+  },
+  "plugins": [
+    {
+      "name": "pubky-pulse-skills",
+      "source": {
+        "source": "local",
+        "path": "."
+      },
+      "category": "Productivity"
+    }
+  ]
+}
