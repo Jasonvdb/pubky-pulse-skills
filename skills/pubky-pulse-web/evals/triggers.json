@@ -1,0 +1,26 @@
+{
+  "should": [
+    "add the Pubky Pulse web SDK to my React app",
+    "configure Pulse in a Vite and Svelte app and track screens",
+    "add error tracking to my React app",
+    "catch every error in this browser app and report it — error boundaries, router errors, failed fetches",
+    "our frontend errors never reach Pulse — are unhandled promise rejections captured automatically",
+    "call Pulse.setUser after sign-in without blocking the login redirect",
+    "add a checkout funnel step to the browser app with Pulse.step",
+    "instrument the client components of this Next.js app with Pubky Pulse events and metrics",
+    "propagate the Pulse session id from the browser to our API",
+    "show the Pubky Pulse feedback and questionnaire flow in a plain JavaScript web app"
+  ],
+  "should_not": [
+    "add Pulse to my Express API",
+    "configure Pubky Pulse in Application.onCreate for our Kotlin app",
+    "add the Pulse SDK to my SwiftUI app",
+    "instrument this whole repo with Pubky Pulse, frontend and backend",
+    "what JavaScript errors are our users hitting in production",
+    "create a web app in Pubky Pulse and set its allowed origins",
+    "query how many page views /checkout got yesterday",
+    "add Tailwind to this React project",
+    "fix the hydration mismatch on the checkout page",
+    "migrate this app from Create React App to Vite"
+  ]
+}

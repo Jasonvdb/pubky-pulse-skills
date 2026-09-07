@@ -1,0 +1,32 @@
+{
+  "name": "pubky-pulse-skills",
+  "owner": {
+    "name": "Jason van den Berg"
+  },
+  "description": "Agent skills for instrumenting and operating Pubky Pulse — install once in Claude Code, Codex, Cursor, or Gemini CLI.",
+  "plugins": [
+    {
+      "name": "pubky-pulse-skills",
+      "source": ".",
+      "description": "Agent skills for instrumenting and operating Pubky Pulse.",
+      "author": {
+        "name": "Jason van den Berg"
+      },
+      "homepage": "https://github.com/Jasonvdb/pubky-pulse-skills",
+      "repository": "https://github.com/Jasonvdb/pubky-pulse-skills",
+      "license": "MIT",
+      "keywords": [
+        "agent-skills",
+        "pubky-pulse",
+        "observability",
+        "analytics",
+        "error-tracking",
+        "mcp",
+        "web",
+        "node",
+        "swift",
+        "android"
+      ]
+    }
+  ]
+}

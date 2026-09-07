@@ -1,0 +1,27 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint manifests and skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Lint manifests and skills
+        run: node scripts/lint-skills.mjs
+
+      - name: Validate skills against the Agent Skills spec
+        run: |
+          set -e
+          for skill in skills/*/; do
+            npx --yes skills-ref validate "$skill"
+          done

@@ -1,0 +1,26 @@
+{
+  "should": [
+    "add the Pubky Pulse Swift SDK to my iOS app",
+    "add crash and error reporting to this SwiftUI app",
+    "instrument this iPadOS app so I can see what users do and what fails",
+    "add Pulse with Swift Package Manager and configure it in the App struct",
+    "does the Pulse Swift SDK capture crashes automatically, and what do I add if it does not",
+    "track screens in my SwiftUI views with Pubky Pulse",
+    "report errors from every do/catch and Task in this Swift app to Pulse",
+    "add Pubky Pulse to a macOS app and its watchOS companion",
+    "wire the Pulse feedback view and a questionnaire into my iOS settings screen",
+    "add a Pubky Pulse lifecycle metric around the sync operation in this Swift package"
+  ],
+  "should_not": [
+    "add Pulse to my Kotlin app",
+    "add the Pubky Pulse web SDK to my React app",
+    "add Pubky Pulse to my Node backend",
+    "instrument this whole repo including the iOS app and its backend",
+    "which iOS crashes are affecting the most users right now",
+    "create an iOS app record in Pubky Pulse and read back its client key",
+    "silence the noisy keychain issue in Pubky Pulse",
+    "fix this Swift concurrency warning about actor isolation",
+    "add a widget extension to my iOS app",
+    "bump the marketing version before release"
+  ]
+}

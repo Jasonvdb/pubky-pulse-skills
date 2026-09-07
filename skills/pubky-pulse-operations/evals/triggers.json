@@ -1,0 +1,26 @@
+{
+  "should": [
+    "create a Pubky Pulse project and an app for the web frontend",
+    "how many signups did we get yesterday",
+    "add http://localhost:3000 to the allowed origins on our Pubky Pulse web app",
+    "define a checkout-latency metric and an onboarding funnel in Pubky Pulse",
+    "query the onboarding funnel conversion for the last 30 days grouped by app version",
+    "list the feedback from this month and mark the handled ones as resolved",
+    "connect the Pubky Pulse MCP server and tell me what my key is allowed to do",
+    "show the questionnaire results for the NPS survey",
+    "create an import key so I can backfill historical events into Pubky Pulse",
+    "which languages do our users want that the app does not ship yet"
+  ],
+  "should_not": [
+    "instrument my whole app with Pubky Pulse",
+    "add the Pulse SDK to this Express server",
+    "what is broken in production and can you fix it",
+    "wire Pulse.step calls into the signup flow in our React app",
+    "configure Pulse in Application.onCreate for our Android app",
+    "resolve the top crash issue at version 5.2.1",
+    "add crash reporting to this SwiftUI app",
+    "run a SQL query against our production Postgres",
+    "set up a Grafana dashboard for our Kubernetes cluster",
+    "add a GitHub Actions workflow that lints the repo"
+  ]
+}

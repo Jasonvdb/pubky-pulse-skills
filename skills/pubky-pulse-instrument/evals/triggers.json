@@ -1,0 +1,26 @@
+{
+  "should": [
+    "add Pulse to this repo",
+    "instrument this monorepo with Pubky Pulse from end to end",
+    "add analytics to this repo",
+    "we have no error tracking anywhere — set it up across the frontend and the API",
+    "draft a tracking plan of events, metrics and funnels for this codebase and then implement it",
+    "onboard this project onto Pubky Pulse: create the project, the apps, and wire every SDK",
+    "add Pubky Pulse to the Next.js app and its API routes",
+    "make this codebase observable — cover every error path and add the signup funnel",
+    "what should we be tracking in this product, and can you wire it up with Pubky Pulse",
+    "set up Pubky Pulse across our iOS app, our Android app and the backend that serves them"
+  ],
+  "should_not": [
+    "which Pubky Pulse issues are still open and who is hitting them",
+    "what broke in production this week",
+    "create a Pubky Pulse funnel called onboarding with four steps",
+    "how many active users did the web app have last week",
+    "our allowed origins list is empty and browser events get 403 — fix the app record",
+    "resolve the crash issue at version 2.4.0 and leave a comment on it",
+    "generate a report of this month's feedback and questionnaire responses",
+    "set up OpenTelemetry tracing for this service",
+    "write unit tests for the checkout reducer",
+    "add a Sentry DSN to the staging environment"
+  ]
+}

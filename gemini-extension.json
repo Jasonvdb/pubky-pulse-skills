@@ -1,0 +1,5 @@
+{
+  "name": "pubky-pulse-skills",
+  "version": "0.1.0",
+  "description": "Agent skills for instrumenting and operating Pubky Pulse in Claude Code, Codex, Cursor, and Gemini CLI."
+}
