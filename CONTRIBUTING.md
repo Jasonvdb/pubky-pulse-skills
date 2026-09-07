@@ -211,8 +211,9 @@ Do not narrate removals ("X was removed") — simply do not mention what is not 
 4. Every `pubky-pulse-<x>` token is a real skill directory or an allow-listed package
    name (`pubky-pulse-web-demo`, `pubky-pulse-skills`, the four SDK packages).
 5. Every `pubky-pulse:<tool>` token exists in `scripts/mcp-tools.json` — the guard
-   against inventing MCP tools. Regenerate that file from the server's tool registry
-   when the tool surface changes.
+   against inventing MCP tools. `node scripts/check-mcp-tools.mjs --server <pubky-pulse
+   checkout>` diffs that file against the tools the server registers; CI runs it on
+   every push, pull request, and weekly, so a tool renamed upstream fails here.
 6. Each referenced `references/*.md` exists, each file in `references/` is mentioned in
    `SKILL.md` on a line saying when to read it, and files over 100 lines start with
    `## Contents`.
