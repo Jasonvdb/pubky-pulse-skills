@@ -380,6 +380,13 @@ a naming convention, stay consistent with it.
 
 ## Identity
 
+Identity is opt-in. Events carry an anonymous id (`pulse_anon_*`) per device until `setUser`
+runs, so unique-user counts and funnels already work without it. Write the call only when the
+developer has explicitly agreed to link analytics to real user ids — the
+`pubky-pulse-instrument` step-4 gate asks, and the answer is what the Play data safety form
+declares. With no answer, write it commented out at the callsite with a one-line
+`// TODO(pulse): ...` marker and nothing else.
+
 ```kotlin
 Pulse.setUser(user.id)                       // after login; claims the anonymous history
 Pulse.setUserProperties(mapOf("plan" to "premium"))

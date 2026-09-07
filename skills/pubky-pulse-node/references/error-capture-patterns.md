@@ -11,6 +11,11 @@
 - Child processes
 - Where to report, and how often
 
+The snippets below scope with `Pulse.withUser(...)` unqualified. That call is opt-in: write it
+only when the developer has agreed to link analytics to real user ids (the
+`pubky-pulse-instrument` step-4 gate asks), otherwise leave it commented out with a
+`// TODO(pulse): ...` marker. Error capture itself needs no identity.
+
 ## What the SDK catches by itself
 
 `configure()` installs additive `process.on("uncaughtException")` and

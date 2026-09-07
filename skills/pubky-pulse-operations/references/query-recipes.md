@@ -137,7 +137,10 @@ Each step returns `unique_users`, `percentage`, `drop_off_count` and
   right for a linear checkout, and unforgiving of a step that fires out of order.
 - Both exclude events with no `user_id`. A backend funnel needs
   `Pulse.withUser(id).step(...)`; a bare `Pulse.step` from a Node process is silently
-  dropped from the analytics.
+  dropped from the analytics. That fix exists only where identity linking was opted into
+  at instrumentation time; anonymous-only, the empty backend funnel is correct, and
+  `Pulse.withSession(...)` — driven by the client's `X-Pulse-Session-Id` header — joins
+  backend events to the browser session without identifying anyone.
 - `group_by` is `environment` or `app_version` only — no device or country breakdown.
 
 ## How has this changed over time?

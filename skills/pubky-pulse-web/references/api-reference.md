@@ -104,6 +104,10 @@ typo becomes its own step.
 
 ## Identity and user properties
 
+`setUser` and `clearUser` are opt-in — write them only when the developer has agreed to link
+analytics to real user ids (the `pubky-pulse-instrument` step-4 gate asks). Everything below
+works on the anonymous id without them.
+
 ```ts
 Pulse.setUser(identifier: string): Promise<void>
 Pulse.clearUser(options?: { newAnonymousId?: boolean }): void

@@ -238,6 +238,12 @@ History API, set `trackPageViews: false` and drive `trackScreen` from the route 
 
 ## Identity
 
+Identity is opt-in. Events carry an anonymous id (`pulse_anon_*`) until `setUser` runs, so
+unique-user counts, per-user timelines and both funnel modes already work without it. Write
+the call only when the developer has explicitly agreed to link analytics to real user ids —
+the `pubky-pulse-instrument` step-4 gate asks. With no answer, write it commented out at the
+callsite with a one-line `// TODO(pulse): ...` marker and nothing else.
+
 ```ts
 void Pulse.setUser(user.id);
 ```

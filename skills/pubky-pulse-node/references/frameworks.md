@@ -24,6 +24,12 @@ Four pieces, whatever the framework:
 4. a flush on the way out — `shutdown()` on a signal, or `wrapHandler` when the runtime
    freezes.
 
+Every `withUser` below is opt-in and written unqualified for brevity: wire it only when the
+developer has explicitly agreed to link analytics to real user ids (the
+`pubky-pulse-instrument` step-4 gate asks). With no answer, leave that one line commented out
+with a `// TODO(pulse): ...` marker and keep the `withSession` line beside it live — Node has
+no anonymous id, so `withSession` is what preserves the browser-to-backend trace.
+
 Express and Fastify are written out in `SKILL.md`. The rest follow.
 
 ## Hono
