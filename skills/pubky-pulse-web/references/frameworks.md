@@ -15,59 +15,61 @@
 ## Where `configure()` goes, per framework
 
 One rule covers all of them: `configure()` runs once, in the browser, before anything logs.
-It needs `window`, so on a server render it validates its arguments and then returns without
-installing anything — an accidental import from server code is harmless with a valid config
-and still throws with an invalid one.
+Put it at **module scope** of the first module the browser evaluates, not inside a mounted
+effect — a passive effect such as `useEffect` runs after the first render has committed, so a
+crash during that render, and anything the render itself logged, is already lost. Module
+scope is safe on every server-rendered framework here because `configure()` needs `window`:
+on a server render it validates its arguments and then returns without installing anything —
+an accidental import from server code is harmless with a valid config and still throws with
+an invalid one.
 
 ## React with Vite
 
 ```tsx
-import { useEffect } from "react";
+// src/main.tsx
+import { createRoot } from "react-dom/client";
 import { Pulse } from "@synonymdev/pubky-pulse-web";
+import { App } from "./App";
 
-export function App() {
-  useEffect(() => {
-    Pulse.configure({
-      endpoint: import.meta.env.VITE_PULSE_ENDPOINT,
-      apiKey: import.meta.env.VITE_PULSE_KEY,
-      bundleId: "app.acme.com",
-      appVersion: __APP_VERSION__,
-      propagateSessionTo: ["/api"],
-    });
-  }, []);
+Pulse.configure({
+  endpoint: import.meta.env.VITE_PULSE_ENDPOINT,
+  apiKey: import.meta.env.VITE_PULSE_KEY,
+  bundleId: "app.acme.com",
+  appVersion: __APP_VERSION__,
+  propagateSessionTo: ["/api"],
+});
 
-  return <Routes />;
-}
+createRoot(document.getElementById("root")!).render(<App />);
 ```
 
-React StrictMode runs effects twice in development, and a second `configure()` tears the
-first pipeline down and starts a new session. That is only local noise; if it gets in the
-way, guard with a module-level boolean rather than by removing StrictMode.
+Configuring in the entry module, before `render`, is what makes a failure in the very first
+render reportable — an error boundary that fires before `configure()` reports into a void.
+It also sidesteps React StrictMode, which runs effects twice in development, where a second
+`configure()` would tear the first pipeline down and start a new session.
 
 ## Next.js App Router
 
-`configure()` needs `window`, so it lives in a client component mounted once in the root
-layout. Keep the layout synchronous — awaiting a session there to fill `userId` would opt
-the whole tree out of static rendering.
+`configure()` needs `window`, so it lives in a client file mounted once in the root layout —
+at that file's module scope, so it has run before the tree renders in the browser. The same
+module is also evaluated during server rendering, where the call is a no-op. Keep the layout
+synchronous — awaiting a session there to fill `userId` would opt the whole tree out of
+static rendering.
 
 ```tsx
 // app/pulse-provider.tsx
 "use client";
 
-import { useEffect } from "react";
 import { Pulse } from "@synonymdev/pubky-pulse-web";
 
-export function PulseProvider() {
-  useEffect(() => {
-    Pulse.configure({
-      endpoint: process.env.NEXT_PUBLIC_PULSE_ENDPOINT!,
-      apiKey: process.env.NEXT_PUBLIC_PULSE_KEY!,
-      bundleId: "app.acme.com",
-      appVersion: process.env.NEXT_PUBLIC_APP_VERSION,
-      propagateSessionTo: ["/api"],
-    });
-  }, []);
+Pulse.configure({
+  endpoint: process.env.NEXT_PUBLIC_PULSE_ENDPOINT!,
+  apiKey: process.env.NEXT_PUBLIC_PULSE_KEY!,
+  bundleId: "app.acme.com",
+  appVersion: process.env.NEXT_PUBLIC_APP_VERSION,
+  propagateSessionTo: ["/api"],
+});
 
+export function PulseProvider() {
   return null;
 }
 ```
@@ -113,14 +115,17 @@ adds. That makes a Next.js repository **two** Pulse apps — `<Project> Web` and
 
 ```tsx
 // pages/_app.tsx
-export default function App({ Component, pageProps }: AppProps) {
-  useEffect(() => {
-    Pulse.configure({ /* same options */ });
-  }, []);
+import { Pulse } from "@synonymdev/pubky-pulse-web";
 
+Pulse.configure({ /* same options */ });
+
+export default function App({ Component, pageProps }: AppProps) {
   return <Component {...pageProps} />;
 }
 ```
+
+Module scope, not `useEffect`: `_app.tsx` is evaluated on the server too, where the call does
+nothing, and in the browser it runs before the first page renders.
 
 The Pages Router navigates with the History API too, so screen tracking needs nothing extra.
 
@@ -128,25 +133,28 @@ The Pages Router navigates with the History API too, so screen tracking needs no
 
 ```svelte
 <!-- src/routes/+layout.svelte -->
-<script lang="ts">
-  import { onMount } from "svelte";
+<script lang="ts" context="module">
+  import { browser } from "$app/environment";
   import { Pulse } from "@synonymdev/pubky-pulse-web";
   import { PUBLIC_PULSE_ENDPOINT, PUBLIC_PULSE_KEY } from "$env/static/public";
 
-  onMount(() => {
+  if (browser) {
     Pulse.configure({
       endpoint: PUBLIC_PULSE_ENDPOINT,
       apiKey: PUBLIC_PULSE_KEY,
       bundleId: "app.acme.com",
       appVersion: __APP_VERSION__,
     });
-
-    return () => void Pulse.shutdown();
-  });
+  }
 </script>
 
 <slot />
 ```
+
+The module block runs once when the layout module is loaded, before the component renders,
+which `onMount` does not — it fires after the first mount, too late for a render failure in
+the tree below. The `browser` guard is belt and braces: `configure()` is already a no-op
+without `window`. Svelte 5 spells the same block `<script module>`.
 
 `+error.svelte` is where render failures surface — report from it (see
 `error-capture-patterns.md`). `+server.ts` endpoints are backend code: Node SDK.

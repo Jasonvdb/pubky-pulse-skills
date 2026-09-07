@@ -74,6 +74,9 @@ failures. Both are global, so no controller repeats itself.
 
 ```ts
 // pulse.interceptor.ts
+import { throwError } from "rxjs";
+import { catchError, finalize } from "rxjs/operators";
+
 @Injectable()
 export class PulseInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -87,12 +90,22 @@ export class PulseInterceptor implements NestInterceptor {
     req.pulse = scope;
 
     const startedAt = Date.now();
+    let status = 0;
     return next.handle().pipe(
-      tap(() => {
+      // catchError stashes the status the filter is about to send, so the
+      // failure path reports the real code rather than the response's default.
+      catchError((err) => {
+        status = err instanceof HttpException ? err.getStatus() : 500;
+        return throwError(() => err);
+      }),
+      // finalize runs exactly once, on completion or on error — tap would fire
+      // per emission, which is none on the error path and several for a
+      // multi-emission Observable. One request, one outcome event.
+      finalize(() => {
         scope.info("request_handled", {
           method: req.method,
           route: req.route?.path ?? req.url,
-          status_code: String(res.statusCode),
+          status_code: String(status || res.statusCode),
           duration_ms: String(Date.now() - startedAt),
         });
       }),

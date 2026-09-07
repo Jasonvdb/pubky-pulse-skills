@@ -115,10 +115,10 @@ Where the call goes depends on the framework:
 
 | Framework | Placement |
 |---|---|
-| React / Vite | `useEffect(..., [])` in the root component |
-| Next.js App Router | a `"use client"` provider component mounted once in the root layout |
-| Next.js Pages Router | `useEffect` in `_app.tsx` |
-| SvelteKit | `onMount` in the root `+layout.svelte` |
+| React / Vite | the browser entry module (`main.tsx`), before `createRoot(...).render(...)` |
+| Next.js App Router | module scope of a `"use client"` provider file mounted once in the root layout |
+| Next.js Pages Router | module scope of `_app.tsx`, above the component |
+| SvelteKit | `<script context="module">` in the root `+layout.svelte`, behind a `browser` guard |
 | Vue / Nuxt | `app.mount()` site, or a client-only plugin in Nuxt |
 | Angular | an `APP_INITIALIZER` factory |
 | Plain page | a `<script type="module">` before the code that logs |
@@ -353,6 +353,10 @@ without `window`), then that the calls happen after `configure()`.
 - **`networkTracking` is off by default** and noisy when on — it emits an event per `fetch`,
   debug level for 2xx/3xx. Session propagation does not need it.
 - **Calls before `configure()` are dropped**, with one `console.debug` and then silence.
+- **`useEffect` is too late.** A passive effect runs only after the first render commits, so
+  a launch-time render failure caught by an error boundary — and anything logged during
+  render — happens before `configure()` and is dropped. Configure at module scope instead;
+  server rendering skips it because there is no `window`.
 - **Server rendering is a no-op with a valid config, and a throw with an invalid one.**
   `configure()` validates first, then returns early when there is no `window`.
 - **Re-`configure()` starts a new session.** React StrictMode runs effects twice in

@@ -19,7 +19,8 @@ Usage: find-uninstrumented-catches.sh <root> [--window N] [--lang ts,swift,kt]
 
 Finds error-handling sites (catch, .catch(, onFailure, runCatching,
 Result.failure, case .failure) that have no Pulse.error call on the same line or
-within the next N lines.
+within the next N lines. The forward search stops at the next error-handling
+site, so a report belonging to a later handler never covers an earlier one.
 
 Only a Pulse receiver counts as a report: `Pulse.error(`, `pulse.error(`, and a
 scoped receiver whose token is `pulse` or ends in `Pulse` (`req.pulse.error(`,
@@ -28,7 +29,8 @@ and `Timber.e` are not captured by any SDK, so a catch that only logs is still
 reported as uninstrumented.
 
 Options:
-  --window N     Lines after the site to search for a report. Default 8.
+  --window N     Lines after the site to search for a report, or until the
+                 next handling site, whichever comes first. Default 8.
   --lang LIST    Comma-separated subset of ts,swift,kt. Default all three.
                  ts = .ts .tsx .js .jsx .mjs .cjs, swift = .swift, kt = .kt .kts
   --self-test    Run the built-in fixture check; exits 1 on a regression.
@@ -72,6 +74,13 @@ scan() {
       sub(/[ \t]+$/, "", s)
       return s
     }
+    function is_site(s) {
+      if (s ~ /^[ \t]*(\/\/|\*|\/\*|#)/) return 0
+      return (s ~ /(^|[^A-Za-z0-9_.])catch([^A-Za-z0-9_]|$)|\.catch\(|onFailure|runCatching|Result\.failure|case[ \t]+\.failure/)
+    }
+    function is_report(s) {
+      return (s ~ /(^|[^A-Za-z0-9_])(pulse|[A-Za-z0-9_]*Pulse)\.error\(/)
+    }
     BEGIN {
       total = 0
       out = ""
@@ -80,12 +89,13 @@ scan() {
         while ((getline line < path) > 0) { n++; L[n] = line }
         close(path)
         for (i = 1; i <= n; i++) {
-          if (L[i] ~ /^[ \t]*(\/\/|\*|\/\*|#)/) continue
-          if (L[i] !~ /(^|[^A-Za-z0-9_.])catch([^A-Za-z0-9_]|$)|\.catch\(|onFailure|runCatching|Result\.failure|case[ \t]+\.failure/) continue
+          if (!is_site(L[i])) continue
           total++
-          reported = 0
-          for (j = i; j <= n && j <= i + window; j++) {
-            if (L[j] ~ /(^|[^A-Za-z0-9_])(pulse|[A-Za-z0-9_]*Pulse)\.error\(/) { reported = 1; break }
+          reported = is_report(L[i])
+          # Stop at the next handling site: its report covers itself, not this one.
+          for (j = i + 1; !reported && j <= n && j <= i + window; j++) {
+            if (is_report(L[j])) { reported = 1; break }
+            if (is_site(L[j])) break
           }
           if (reported) continue
           snippet = trim(L[i])
@@ -168,6 +178,21 @@ export function handle(req) {
 }
 FIXTURE
 
+  cat >"$st_dir/src/adjacent.ts" <<'FIXTURE'
+export async function refresh() {
+  try {
+    await pull();
+  } catch (err) {
+    showToast("failed");
+  }
+  try {
+    await push();
+  } catch (err) {
+    Pulse.error(err, "push_failed");
+  }
+}
+FIXTURE
+
   cat >"$st_dir/node_modules/vendor.ts" <<'FIXTURE'
 try { a(); } catch (e) { ignore(e); }
 FIXTURE
@@ -176,12 +201,13 @@ FIXTURE
   rm -rf "$st_dir"
 
   st_status=0
-  # Eight sites: bad.ts catch, good.ts catch, good.ts .catch(, Repo.kt runCatching,
-  # Repo.kt onFailure, View.swift case .failure, logged.ts catch, scoped.ts catch.
-  # Four are unreported — bad.ts, both Kotlin sites and logged.ts, which only
-  # reaches console.error — and the Swift comment line is not a site at all.
-  echo "$st_out" | grep -q '"total":8' || {
-    echo "self-test: expected 8 sites, got: $st_out" >&2
+  # Ten sites: bad.ts catch, good.ts catch, good.ts .catch(, Repo.kt runCatching,
+  # Repo.kt onFailure, View.swift case .failure, logged.ts catch, scoped.ts catch,
+  # and both catches in adjacent.ts. Five are unreported — bad.ts, both Kotlin
+  # sites, logged.ts, which only reaches console.error, and the first catch in
+  # adjacent.ts — and the Swift comment line is not a site at all.
+  echo "$st_out" | grep -q '"total":10' || {
+    echo "self-test: expected 10 sites, got: $st_out" >&2
     st_status=1
   }
   echo "$st_out" | grep -q '"file":"[^"]*bad\.ts","line":4' || {
@@ -207,6 +233,15 @@ FIXTURE
   esac
   case $st_out in
     *node_modules*) echo "self-test: did not skip node_modules" >&2; st_status=1 ;;
+  esac
+  echo "$st_out" | grep -q '"file":"[^"]*adjacent\.ts","line":4' || {
+    echo "self-test: a later handler's Pulse.error must not cover the catch before it" >&2
+    st_status=1
+  }
+  case $st_out in
+    *'adjacent.ts","line":9'*)
+      echo "self-test: flagged the adjacent catch that reports on its own next line" >&2
+      st_status=1 ;;
   esac
 
   if [ "$st_status" -eq 0 ]; then echo "self-test: ok"; fi

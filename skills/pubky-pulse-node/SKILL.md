@@ -170,14 +170,23 @@ const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
 };
 app.use(errorHandler);
 
-// 4. Drain the buffer on the way out.
+// 4. Stop taking work, let the in-flight requests finish, then drain the buffer.
 const server = app.listen(port);
 process.on("SIGTERM", async () => {
-  server.close();
+  await Promise.race([
+    new Promise((resolve) => server.close(() => resolve())),
+    new Promise((resolve) => setTimeout(resolve, 10_000).unref()),
+  ]);
   await Pulse.shutdown();
   process.exit(0);
 });
 ```
+
+`server.close()` only stops new connections and returns straight away — its callback is what
+fires once the last in-flight request has finished. Shutting Pulse down before that point
+kills those requests and throws away the events they were about to emit, so the order is:
+await the close, then flush, then exit. The race caps the wait, because one stuck keep-alive
+connection would otherwise hold the process until the orchestrator sends `SIGKILL`.
 
 An async route handler that rejects reaches this error handler only on Express 5, or on
 Express 4 with a wrapper that forwards to `next(err)`. On Express 4, wrap async handlers:
@@ -235,7 +244,15 @@ app.setErrorHandler((error, request, reply) => {
 app.addHook("onClose", async () => {
   await Pulse.shutdown();
 });
+
+process.on("SIGTERM", async () => {
+  await app.close(); // resolves once in-flight requests finish, then runs onClose
+  process.exit(0);
+});
 ```
+
+Fastify does the same sequencing for you: `app.close()` resolves only after the in-flight
+requests are done, and the `onClose` hook flushes after that — so await it before exiting.
 
 `onRequest` runs before the body is parsed, which is what you want — the scope has to exist
 before anything can fail. Use `request.routeOptions.url` (the route pattern) rather than

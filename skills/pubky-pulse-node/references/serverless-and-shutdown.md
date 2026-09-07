@@ -97,7 +97,13 @@ const server = app.listen(port);
 
 async function shutdown(signal: string) {
   Pulse.info("service_stopping", { signal });
-  server.close();                 // stop accepting new connections
+  await Promise.race([
+    // close() stops new connections and returns at once; the callback fires
+    // when the last in-flight request is done.
+    new Promise((resolve) => server.close(() => resolve())),
+    // …unless a stuck keep-alive connection never lets go.
+    new Promise((resolve) => setTimeout(resolve, 10_000).unref()),
+  ]);
   await Pulse.shutdown();         // emit sdk:session_ended, flush, tear down
   process.exit(0);
 }
@@ -109,8 +115,10 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 `shutdown()` removes the unhandled-error listeners, emits `sdk:session_ended` if a session
 ever started, flushes buffered events and pending attachments, and clears state — after it,
 log calls are dropped again until the next `configure()`. Order matters: stop taking work
-first, then flush, then exit. Fastify's `onClose` hook and NestJS's `onApplicationShutdown`
-(with `enableShutdownHooks()`) are the framework-native places for the same call.
+first, wait for the requests already running — flushing before they finish discards the
+events they still have to emit — then flush, then exit. Fastify's `onClose` hook (behind
+`await app.close()`) and NestJS's `onApplicationShutdown` (with `enableShutdownHooks()`) are
+the framework-native places for the same call, and both already wait for in-flight work.
 
 ## Containers and orchestrators
 
