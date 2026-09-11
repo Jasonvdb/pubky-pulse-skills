@@ -37,16 +37,16 @@ harnesses use their own prefix.
 
 ## Before writing code
 
-Three things come from the Pubky Pulse app, not from the repository:
+Use the client key for the Pulse app and the endpoint for its instance:
 
 | Input | Where it comes from | Trap |
 |---|---|---|
-| `endpoint` | the Pulse server base URL | no trailing path; `/v1/ingest` is added by the SDK |
+| `endpoint` | the Pulse server base URL | set it explicitly for self-hosting; omitted uses `https://ingest.pubkypulse.com` |
 | `apiKey` | the `client_secret` of a `web` app (`pulse_client_…`) | public by design, so a `VITE_`/`NEXT_PUBLIC_` variable is correct here |
-| `bundleId` | that app's `bundle_id` | a site identifier *name* (`app.acme.com`), never a URL, and never checked against the page origin |
+| `bundleId` | optional legacy identifier | the client key identifies the web app; omit from new integrations |
 
 Get them with `pubky-pulse:list-apps` / `pubky-pulse:get-app`, or create the app with
-`pubky-pulse:create-app` (`platform: "web"`, a `bundle_id`, and `allowed_origins`). Then
+`pubky-pulse:create-app` (`platform: "web"`, a site-identifier `bundle_id`, and `allowed_origins`). Then
 check the origins before anything else:
 
 - [ ] The app's `allowed_origins` lists every origin the site is served from, **including
@@ -84,26 +84,33 @@ Then carry on with every step that only touches code, and finish with a
 `Pending Pubky Pulse steps` list naming each project, app, metric and funnel that
 still has to be created once the server is connected.
 
-## Install and configure
+## Install and initialize
 
 ```sh
 npm install @synonymdev/pubky-pulse-web
 ```
 
-`Pulse` is a module singleton — no provider, no context, no hooks. Configure it once, as
-early in the page's life as possible:
+`Pulse` is a module singleton — no provider, context or hooks required. These patterns
+require **Web SDK 0.6.0 or newer**; upgrade an older installed version before using them.
+Initialize in the browser entry module before rendering:
 
 ```ts
 import { Pulse } from "@synonymdev/pubky-pulse-web";
 
-Pulse.configure({
+Pulse.init({
   endpoint: import.meta.env.VITE_PULSE_ENDPOINT,
   apiKey: import.meta.env.VITE_PULSE_KEY,
-  bundleId: "app.acme.com",
   appVersion: __APP_VERSION__,
   propagateSessionTo: ["/api"],
 });
 ```
+
+An absent or blank key and `enabled: false` disable telemetry without creating browser
+identity, storage, listeners or network requests. SSR is a quiet no-op; a later browser
+initialization can succeed. Inspect the returned `status` / `reason` when diagnosing setup.
+The first successful configuration wins, so repeated startup calls need no custom guard.
+Keep callbacks and policy in one app-owned module. `configure()` remains available when
+throwing validation and explicit reconfiguration are intentional.
 
 `appVersion` is the only release identifier a browser app has — there is no build number —
 so leaving it out disables issue regression detection and every version badge for this app.
@@ -118,7 +125,7 @@ Where the call goes depends on the framework:
 | React / Vite | the browser entry module (`main.tsx`), before `createRoot(...).render(...)` |
 | Next.js App Router | module scope of a `"use client"` provider file mounted once in the root layout |
 | Next.js Pages Router | module scope of `_app.tsx`, above the component |
-| SvelteKit | `<script context="module">` in the root `+layout.svelte`, behind a `browser` guard |
+| SvelteKit | `<script context="module">` in the root `+layout.svelte`, before the layout renders |
 | Vue / Nuxt | `app.mount()` site, or a client-only plugin in Nuxt |
 | Angular | an `APP_INITIALIZER` factory |
 | Plain page | a `<script type="module">` before the code that logs |
@@ -126,38 +133,44 @@ Where the call goes depends on the framework:
 Read `references/frameworks.md` when the project is Next.js, SvelteKit, Nuxt, Angular or a
 hash router, or when you need the build-time version injection for its bundler.
 
-## Catch every error
+## Capture failures at their owning boundaries
 
 Automatic capture covers exactly two hooks: `window`'s `error` and `unhandledrejection`
-events, tagged `_unhandled`. Everything below is invisible until you write the call, so
-work the list top to bottom and note in the final report which rows the project needed:
+events, tagged `_unhandled`. Add reporting where the framework or app handles failures
+before they reach those hooks. Prefer one existing error boundary, query-cache callback or
+request wrapper over reporting the same failure at every callsite. Review these paths:
 
 - [ ] **Error boundary** — React (and every other framework's equivalent) swallows render
       errors. A boundary that does not report is a silent failure.
 - [ ] **Router error elements** — `errorElement` / `+error.svelte` / Vue's `onErrorCaptured`.
-- [ ] **Every `catch` on an async path** — data loading, mutations, uploads, parsing.
+- [ ] **Handled async failures** — data loading, mutations, uploads, parsing; cover them
+      centrally where possible and exclude expected cancellations through app policy.
 - [ ] **Non-2xx `fetch` responses** — a `404` is a resolved promise, not a rejection.
 - [ ] **Data-layer hooks** — TanStack Query, SWR, Apollo, RTK Query error callbacks.
 - [ ] **`XMLHttpRequest` and axios** — the SDK wraps `fetch` only.
 - [ ] **Web workers** — a worker's failures never reach the page's `window` handlers.
 - [ ] **`console.error` sites** — not captured; convert the ones that mean a real failure.
 
-The canonical call passes the error object, because the extracted `_error_type` is what
-keeps different error classes with the same wording on separate issues:
+Pass the original thrown value directly; `captureException` accepts `unknown` and extracts
+error type, stack and causes without serializing arbitrary error properties:
 
 ```ts
 try {
   await pay(order);
 } catch (err) {
-  Pulse.error(err instanceof Error ? err : new Error(String(err)), "checkout_failed", {
-    order_id: order.id,
+  Pulse.captureException(err, {
+    message: "checkout_failed",
+    attributes: { checkout_stage: "payment" },
   });
 }
 ```
 
-The `instanceof` guard matters: the Error overload is chosen only when the first argument
-is **not** a string, so a caught `string` would be read as a logger-style message and the
-arguments after it would land in the wrong slots.
+Use one app-owned `ignoreErrors` list and a synchronous `beforeSend(event, hint)` policy
+for expected failures, redaction and allowlisted metadata. `hint.originalException` is
+capture-only context; never copy the object or its context wholesale into the event.
+Returning `null` drops the event. The same `Error` object is attempted once per client
+lifetime, even if filtered; distinct errors and primitive throws are not deduplicated.
+`captureException` stays quiet before initialization and while disabled.
 
 Read `references/error-capture-patterns.md` when wiring a React error boundary, a router
 error element, a query-library error handler, an axios interceptor, or a web worker — it
@@ -199,7 +212,7 @@ paths. Debounce to an outcome, or measure the whole interaction with one operati
 | Metric slug | kebab-case, created on the server first | `process-payment` |
 | Funnel slug and step | kebab-case, created on the server first | `onboarding`, `onboarding-email` |
 | Questionnaire slug | kebab-case, immutable after creation | `nps-q3` |
-| Screen name | native: PascalCase human name; web: URL path, tracked automatically | `Checkout`, `/checkout` |
+| Screen name | native: PascalCase human name; web: app-owned safe route template, tracked automatically | `Checkout`, `/users/[id]` |
 | Web `bundle_id` | a site identifier name, not a URL | `app.acme.com` |
 
 Rule of thumb: hyphens mean the name must exist on the server first; underscores
@@ -217,19 +230,32 @@ Pulse.error("payment_declined", { code: "insufficient_funds" });
 ```
 
 Attribute values are stringified and capped at 200 characters; entries whose value is
-`undefined` or `null` are dropped, so optional fields pass straight through. Never invent an underscore-prefixed
-key — those are reserved for the SDK. Two of them are useful to set by hand, because
-`screen_name` on web holds the path alone:
-
-```ts
-Pulse.info("checkout_started", { _page_url: location.href, _referrer: document.referrer });
-```
+`undefined` or `null` are dropped, so optional fields pass straight through. Never invent an
+underscore-prefixed key — those are reserved for the SDK. Do not add raw page URLs or
+referrers merely for extra context: they can contain identifiers and query secrets. Use safe route templates and allowlisted attributes instead.
 
 ## Screens
 
 History-API navigations are tracked automatically: `pushState`, `replaceState` and
 `popstate` emit `sdk:screen_appeared` / `sdk:screen_disappeared` at debug level whenever
 `location.pathname` changes. Hash-only changes are ignored.
+
+The default is the raw pathname. For routes containing identifiers, reuse app-owned routing
+constants with the exported mapper instead of writing another path sanitizer:
+
+```ts
+import { createScreenNameMapper } from "@synonymdev/pubky-pulse-web";
+
+const screenNameForPath = createScreenNameMapper(
+  ["/", "/orders/new", "/orders/[orderId]"],
+  { fallback: "/unknown" },
+);
+// Include screenNameForPath in the initial Pulse.init options.
+```
+
+Only configured templates or the fallback are emitted. Static routes beat parameters;
+`[name]` matches one segment, with no catch-all or optional syntax. Invalid templates throw
+when creating the mapper. Manual screen labels still need the same app-owned privacy policy.
 
 Call `Pulse.trackScreen("Checkout / Payment")` for what the URL does not describe — a
 modal, a wizard step, a tab. It also becomes the default `screen_name` for later events,
@@ -305,10 +331,15 @@ route with a variable segment (`/orders/8f21/confirm`) never matches a fixed fil
 ## Sending the session to your backend
 
 ```ts
-Pulse.configure({ /* … */ propagateSessionTo: ["/api", "https://api.acme.com"] });
+Pulse.init({
+  endpoint: PULSE_ENDPOINT,
+  apiKey: PULSE_KEY,
+  propagateSessionTo: ["/api", "https://api.acme.com"],
+});
 ```
 
-Listed prefixes get an `X-Pulse-Session-Id` header, so browser and server events land on one
+Include these options in the initial configuration. Listed prefixes get an
+`X-Pulse-Session-Id` header, so browser and server events land on one
 session timeline. It is implemented by wrapping the global `fetch`, so `XMLHttpRequest`,
 `sendBeacon` and axios in its default browser build are **not** annotated and must set the
 header themselves:
@@ -350,32 +381,32 @@ localhost is dev traffic, and the default `production` mode will show nothing:
       Issues are derived by an hourly scan, so `pubky-pulse:list-issues` lags behind.
 
 Nothing arriving: check `allowed_origins` (a `403` on the ingest request is this), then the
-browser network tab for the request at all (a `configure()` that threw, or one that ran
-without `window`), then that the calls happen after `configure()`.
+initialization result (`disabled` for no key/SSR, `error` for invalid setup), then the
+browser network tab and whether capture runs after browser initialization.
 
 ## Gotchas
 
 - **Empty `allowed_origins` blocks everything.** A newly created web app has none.
 - **The dev origin is a separate entry.** `http://localhost:3000` and `http://localhost:5173`
   are different origins, and so is `http://127.0.0.1:3000`.
-- **`bundleId` is a name, not a URL.** It must equal the app's `bundle_id` exactly; it is
-  immutable after the app is created, and it is not compared against the page's origin.
-- **`Pulse.error("string", …)` is the logger overload.** Wrap a caught value that might not
-  be an `Error` before passing anything after it.
+- **Set the endpoint for self-hosting.** Omitting it uses the hosted ingest service. The
+  client key identifies the web app; `bundleId` is optional legacy metadata.
+- **Use `captureException` for unknown throws.** `Pulse.error("string", …)` is the logger
+  overload. Retain the Error overload when per-event screen/attachment options are needed.
 - **`console.error` is not captured**, and neither are React error boundaries, resource-load
   failures, `XMLHttpRequest`, or errors inside a web worker.
-- **`networkTracking` is off by default** and noisy when on — it emits an event per `fetch`,
-  debug level for 2xx/3xx. Session propagation does not need it.
-- **Calls before `configure()` are dropped**, with one `console.debug` and then silence.
-- **`useEffect` is too late.** A passive effect runs only after the first render commits, so
-  a launch-time render failure caught by an error boundary — and anything logged during
-  render — happens before `configure()` and is dropped. Configure at module scope instead;
-  server rendering skips it because there is no `window`.
-- **Server rendering is a no-op with a valid config, and a throw with an invalid one.**
-  `configure()` validates first, then returns early when there is no `window`.
-- **Re-`configure()` starts a new session.** React StrictMode runs effects twice in
-  development, so expect a doubled session locally; guard with a module-level flag if the
-  noise is a problem.
+- **`networkTracking` is off by default.** When requested, prefer
+  `{ urlMode: "origin" }` if paths contain identifiers. `true` retains sanitized paths.
+  Session propagation does not require network events. Manual URL attributes are not sanitized
+  by this setting; keep them origin-only or use approved templates.
+- **Initialize before rendering when early errors matter.** A passive effect misses events
+  from the first render. `init()` is safe at module scope during SSR and missing-key builds.
+- **The first successful `init()` wins.** Changed options are ignored until shutdown or
+  disable. `await Pulse.shutdown()` drains; `Pulse.init({ enabled: false })` discards pending
+  memory without flushing. Disable preserves existing storage and cannot recall sent data;
+  an old offline queue may replay on later initialization.
+- **`configure()` remains strict.** It validates even during SSR and replaces a running
+  configuration. Existing logger calls before setup retain their one-time console note.
 - **`isDev` defaults to true only on `localhost`, `127.0.0.1` and `file:`.** A staging
   hostname counts as production until you set `isDev` yourself.
 - **Attachments need a secure context** (`crypto.subtle`). Over plain HTTP the upload is
@@ -388,7 +419,7 @@ without `window`), then that the calls happen after `configure()`.
 
 ## References
 
-- `references/frameworks.md` — read when placing `configure()` in Next.js (App or Pages
+- `references/frameworks.md` — read when placing `init()` in Next.js (App or Pages
   Router), SvelteKit, Vue/Nuxt, Angular or a plain page, or when injecting `appVersion`
   from the bundler.
 - `references/error-capture-patterns.md` — read when wiring an error boundary, a router

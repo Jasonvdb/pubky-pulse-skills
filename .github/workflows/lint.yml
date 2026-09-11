@@ -21,6 +21,9 @@ jobs:
       - name: Lint manifests and skills
         run: node scripts/lint-skills.mjs
 
+      - name: Check error-coverage scanner
+        run: skills/pubky-pulse-instrument/scripts/find-uninstrumented-catches.sh --self-test
+
       - name: Validate skills against the Agent Skills spec
         run: |
           set -e

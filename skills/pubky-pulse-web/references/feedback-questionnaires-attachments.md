@@ -121,7 +121,9 @@ belongs; later fetches come back with `ineligibleReason: "globally_dismissed"`.
 
 ## Attachments
 
-Any log call takes attachments in its per-call options:
+Logger calls take attachments in per-call options; `captureException` does not. Keep the
+existing Error overload for this case, and ensure `err` is an `Error` (a string selects the
+message logger overload):
 
 ```ts
 Pulse.error(err, "import_failed", { rows: "1200" }, {

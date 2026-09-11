@@ -191,7 +191,7 @@ consistently after the next surface is added.
 | Event message | snake_case, outcome-oriented, never interpolated | `checkout_completed` |
 | Metric slug | kebab-case, created on the server first | `process-payment` |
 | Funnel slug and step | kebab-case, created on the server first | `onboarding`, `onboarding-email` |
-| Screen name | native: PascalCase human name; web: URL path, tracked automatically | `Checkout`, `/checkout` |
+| Screen name | native: PascalCase human name; web: app-owned safe route template, tracked automatically | `Checkout`, `/users/[id]` |
 
 The rule of thumb behind the table: **hyphens = must exist on the server first,
 underscores = free-form event**. Event messages are the key errors are grouped by, so
@@ -254,7 +254,9 @@ skills/pubky-pulse-operations/scripts/check-mcp-config.sh --help
 ```
 
 Both print JSON on stdout and change nothing; the first also has a `--self-test` that
-runs its built-in fixtures.
+runs its built-in fixtures, also checked in CI. It recognizes `Pulse.error` and
+browser `Pulse.captureException` on Pulse receivers; helper-based reporting needs
+a manual coverage review.
 
 ### Trigger evals
 

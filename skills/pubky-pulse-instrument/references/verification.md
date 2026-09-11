@@ -28,11 +28,12 @@ Add `compact: true` to any event query long enough to risk a token overflow.
 
 ## What a healthy result looks like
 
-- **`sdk:session_started` per app.** It is emitted by `configure()`, so its absence
-  means the SDK never configured, never had a key that worked, or never reached the
-  endpoint. Nothing else is worth checking until it is there.
+- **`sdk:session_started` per app.** It is emitted when initialization succeeds,
+  so its absence can mean the SDK is disabled, never had a key that worked, or never
+  reached the endpoint. On web, inspect the bounded `Pulse.init` status and reason
+  first; intentionally disabled tracking should send nothing.
 - **The planned events**, with their attributes populated and `screen_name` set on the
-  client surfaces (a URL path on web, a PascalCase name on native).
+  client surfaces (an app-owned safe route template on web, a PascalCase name on native).
 - **One `start` and exactly one terminal phase per metric operation.** Two terminal
   phases means a code path finishes twice; none means an operation leaked.
 - **Funnel steps with non-zero users at step 1.** Zero at every step, on a backend
@@ -60,13 +61,14 @@ later checks meaningless.
    the data lands under the wrong app, which looks identical to nothing arriving.
 4. **The endpoint.** It is a base URL. The SDK appends `/v1/ingest` itself, so an
    endpoint that already ends in `/v1/ingest` or `/mcp` produces a 404 per batch.
-5. **Configure ordering.** Calls made before `configure()` are dropped with a single
-   console line and then silence. Check that the configuring module is imported before
-   anything that logs — on a backend, that the process imported it at all.
-6. **Server rendering.** With a valid config and no `window`, `configure()` returns
-   early and every call is a no-op; with an invalid config it throws during server
-   rendering rather than in the browser. Confirm the configure call runs on the client
-   — an effect, `onMount`, a client-only plugin.
+5. **Initialization ordering.** Browser `captureException` silently drops calls before
+   initialization or while disabled. Other logger calls retain their preconfiguration
+   console note. Check the browser `Pulse.init` result and ensure initialization runs
+   before reporting; on a backend, check that the configuring module was imported.
+6. **Server rendering.** Browser `Pulse.init` safely returns disabled with reason
+   `ssr` without validating or creating a client; initialize again in the browser
+   entry point, an effect, `onMount` or a client-only plugin. Strict `configure()`
+   still validates and can throw during SSR.
 7. **Flush.** A short-lived process exits with a full buffer: a one-shot script needs
    `await Pulse.flush()`, a serverless handler needs `wrapHandler`, and a container
    killed with `SIGTERM` needs a signal handler that awaits `shutdown()`. The
@@ -77,8 +79,9 @@ later checks meaningless.
    crashed tab.
 
 If `sdk:session_started` is present and only *your* events are missing, the SDK is
-fine and the calls are not running — check the code path actually executes, and that
-attribute values are not `undefined` in a way that made you expect a different event.
+running. Check that the calls execute, then inspect `ignoreErrors` and `beforeSend`
+policy; matching patterns, a null hook result or a throwing hook can drop events.
+Check attribute values too; `undefined` may not produce the event you expected.
 
 ## Something arrives, but it is wrong
 
@@ -91,6 +94,6 @@ attribute values are not `undefined` in a way that made you expect a different e
 | Metric slug looks different from the plan | the SDK auto-corrected it to `^[a-z0-9-]+$` |
 | One issue per occurrence | the message is interpolated; move the variable part into an attribute |
 | Two unrelated failures in one issue | the error value was not passed, so there is no `_error_type` to discriminate |
-| Doubled sessions in development | a second `configure()` call — React StrictMode runs effects twice |
+| Doubled browser sessions in development | repeated strict `configure()` calls; use `init`, which retains the first successful client across React effects |
 | No version badge, no regression detection | `appVersion` is unset, or is a git SHA and therefore not monotonic |
 | Browser and backend events on separate sessions | `propagateSessionTo` missing, or the backend never read `X-Pulse-Session-Id`; a non-UUID value is ignored silently |
