@@ -156,7 +156,7 @@ Apollo — an error link in front of the HTTP link:
 ```ts
 const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
   for (const e of graphQLErrors ?? []) {
-    Pulse.captureException(e, {
+    Pulse.captureException(e instanceof Error ? e : new Error(e.message), {
       message: "graphql_error",
       attributes: { operation: operation.operationName },
     });
@@ -169,6 +169,11 @@ const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
   }
 });
 ```
+
+Apollo may supply plain formatted objects. Preserve their known `message` in an Error:
+a fixed event message otherwise replaces that diagnostic text in SDK 0.6.0. Keep existing
+Error instances intact, and let the shared redaction policy process the extracted stack;
+do not copy the response object or its extensions.
 
 Query keys, mutation variables and request bodies can contain private values; add only
 reviewed labels through the shared policy.
@@ -245,13 +250,17 @@ listeners. Report from the page side, which is where `Pulse` is configured:
 const worker = new Worker(new URL("./parser.worker.ts", import.meta.url), { type: "module" });
 
 worker.onerror = (event) => {
-  Pulse.captureException(event.error ?? event.message, {
+  Pulse.captureException(event.error ?? new Error(event.message), {
     message: "worker_failed",
     attributes: { worker: "parser" },
   });
 };
 worker.onmessageerror = () => Pulse.error("worker_message_failed", { worker: "parser" });
 ```
+
+The worker fallback wraps only the known message when no original error is available,
+so the fixed `worker_failed` event name does not discard its diagnostic text. Shared
+redaction still applies to the extracted stack.
 
 Inside the worker, catch and `postMessage` a structured failure to the page rather than
 trying to configure a second SDK instance there.
