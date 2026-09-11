@@ -18,6 +18,12 @@ Two `window` listeners, installed while `captureUnhandled` is on: `error` and
 browser still logs the error and any other handler still runs. Each event is logged at
 error level with `_unhandled` set to `uncaught_exception` or `unhandled_rejection`.
 
+Use `captureException` (Web SDK 0.6.0+) at the owning boundary for handled failures.
+Pass the original value without wrapping it; repeated capture of the same Error object is
+attempted only once per client lifetime. Distinct objects and primitive values can repeat.
+Centralize expected-error filtering, metadata allowlists and redaction in `ignoreErrors` /
+`beforeSend` at initialization; see `api-reference.md`.
+
 Everything else is yours. In particular: `console.error`, framework error boundaries,
 resource-load failures (`<img>`, `<script>`), `XMLHttpRequest`, and anything thrown inside
 a worker.
@@ -42,8 +48,9 @@ export class PulseErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    Pulse.error(error, "react_render_failed", {
-      component_stack: info.componentStack?.slice(0, 200) ?? "",
+    Pulse.captureException(error, {
+      message: "react_render_failed",
+      attributes: { component_stack: info.componentStack ?? "" },
     });
   }
 
@@ -66,11 +73,7 @@ the element, not from the loader:
 function RouteError() {
   const error = useRouteError();
   useEffect(() => {
-    Pulse.error(
-      error instanceof Error ? error : new Error(String(error)),
-      "route_error",
-      { route: location.pathname },
-    );
+    Pulse.captureException(error, { message: "route_error" });
   }, [error]);
   return <p>Something went wrong.</p>;
 }
@@ -87,8 +90,9 @@ SvelteKit — `src/routes/+error.svelte` for render and load failures, and `hand
 ```ts
 // src/hooks.client.ts
 export const handleError: HandleClientError = ({ error, event }) => {
-  Pulse.error(error instanceof Error ? error : new Error(String(error)), "client_error", {
-    route: event.route.id ?? "unknown",
+  Pulse.captureException(error, {
+    message: "client_error",
+    attributes: { route: event.route.id ?? "unknown" },
   });
   return { message: "Something went wrong." };
 };
@@ -99,7 +103,7 @@ component tree throws:
 
 ```ts
 app.config.errorHandler = (err, _instance, info) => {
-  Pulse.error(err instanceof Error ? err : new Error(String(err)), "vue_error", { info });
+  Pulse.captureException(err, { message: "vue_error", attributes: { info } });
 };
 ```
 
@@ -110,7 +114,7 @@ little in an Angular app:
 @Injectable()
 export class PulseErrorHandler implements ErrorHandler {
   handleError(error: unknown): void {
-    Pulse.error(error instanceof Error ? error : new Error(String(error)), "angular_error");
+    Pulse.captureException(error, { message: "angular_error" });
     console.error(error);
   }
 }
@@ -129,17 +133,13 @@ TanStack Query — the query cache, so one call covers every query:
 ```ts
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
-    onError: (error, query) => {
-      Pulse.error(error instanceof Error ? error : new Error(String(error)), "query_failed", {
-        query_key: JSON.stringify(query.queryKey).slice(0, 200),
-      });
+    onError: (error) => {
+      Pulse.captureException(error, { message: "query_failed" });
     },
   }),
   mutationCache: new MutationCache({
-    onError: (error, _vars, _ctx, mutation) => {
-      Pulse.error(error instanceof Error ? error : new Error(String(error)), "mutation_failed", {
-        mutation_key: JSON.stringify(mutation.options.mutationKey ?? "").slice(0, 200),
-      });
+    onError: (error) => {
+      Pulse.captureException(error, { message: "mutation_failed" });
     },
   }),
 });
@@ -148,7 +148,7 @@ const queryClient = new QueryClient({
 SWR — `onError` on the global config:
 
 ```tsx
-<SWRConfig value={{ onError: (error, key) => Pulse.error(error, "swr_failed", { key }) }}>
+<SWRConfig value={{ onError: (error) => Pulse.captureException(error, { message: "swr_failed" }) }}>
 ```
 
 Apollo — an error link in front of the HTTP link:
@@ -156,40 +156,56 @@ Apollo — an error link in front of the HTTP link:
 ```ts
 const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
   for (const e of graphQLErrors ?? []) {
-    Pulse.error(new Error(e.message), "graphql_error", {
-      operation: operation.operationName,
-      path: e.path?.join(".") ?? "",
+    Pulse.captureException(e instanceof Error ? e : new Error(e.message), {
+      message: "graphql_error",
+      attributes: { operation: operation.operationName },
     });
   }
   if (networkError) {
-    Pulse.error(networkError, "graphql_network_error", { operation: operation.operationName });
+    Pulse.captureException(networkError, {
+      message: "graphql_network_error",
+      attributes: { operation: operation.operationName },
+    });
   }
 });
 ```
+
+Apollo may supply plain formatted objects. Preserve their known `message` in an Error:
+a fixed event message otherwise replaces that diagnostic text in SDK 0.6.0. Keep existing
+Error instances intact, and let the shared redaction policy process the extracted stack;
+do not copy the response object or its extensions.
+
+Query keys, mutation variables and request bodies can contain private values; add only
+reviewed labels through the shared policy.
 
 Note the retry interaction: with retries on, report the final outcome and put the attempt
 count in an attribute rather than logging every attempt.
 
 ## `fetch` responses that are not 2xx
 
-`fetch` rejects only on a network failure. A `404` or a `500` is a resolved promise, so it
-is invisible unless you check:
+`fetch` rejects only on a network failure. A non-2xx response is resolved, so decide once
+in the existing request layer how it becomes an application failure. If that layer throws
+an error that a query-cache or another owning boundary already reports, let that boundary
+capture it. Avoid a separate Pulse call just before every throw.
+
+When automatic fetch diagnostics are requested, `networkTracking: { urlMode: "origin" }`
+captures statuses and failures without path parameters. Session propagation works without
+network tracking. If the app instead reports a response locally, use a stable message and
+safe attributes, and ensure an outer layer does not also report the same outcome:
 
 ```ts
-const res = await fetch(url, init);
 if (!res.ok) {
   Pulse.error("api_request_failed", {
-    _http_url: url,
-    _http_method: init?.method ?? "GET",
+    request: "load_orders",
+    _http_method: "GET",
     _http_status: String(res.status),
   });
-  throw new Error(`${init?.method ?? "GET"} ${url} → ${res.status}`);
+  return showRequestError(res.status);
 }
 ```
 
-Use the reserved `_http_*` keys — the issue tracker discriminates network errors on method
-and templated path, so a failure against a third party stays separate from one against your
-own API. Do this once in the app's fetch wrapper, not at every call site.
+A manual `_http_url` must be an approved route template or origin; the SDK's network URL
+mode does not sanitize attributes you supply. Never put raw request URLs into error messages.
 
 ## axios and anything on `XMLHttpRequest`
 
@@ -206,15 +222,21 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    Pulse.error(error instanceof Error ? error : new Error(String(error)), "api_request_failed", {
-      _http_url: error.config?.url ?? "",
-      _http_method: (error.config?.method ?? "get").toUpperCase(),
-      _http_status: String(error.response?.status ?? 0),
+    Pulse.captureException(error, {
+      message: "api_request_failed",
+      attributes: {
+        _http_method: (error.config?.method ?? "get").toUpperCase(),
+        _http_status: String(error.response?.status ?? 0),
+      },
     });
     return Promise.reject(error);
   },
 );
 ```
+
+Install this on an API client restricted to trusted destinations, because it attaches the
+session header. If a query-cache boundary already owns reporting, retain only session
+propagation here. Do not copy axios config or response bodies into attributes.
 
 Re-reject: swallowing the error here would break every caller's own handling. A bare
 `XMLHttpRequest` needs the same header set by hand — see the SDK's `Pulse.sessionId`.
@@ -228,14 +250,17 @@ listeners. Report from the page side, which is where `Pulse` is configured:
 const worker = new Worker(new URL("./parser.worker.ts", import.meta.url), { type: "module" });
 
 worker.onerror = (event) => {
-  Pulse.error("worker_failed", {
-    worker: "parser",
-    detail: event.message ?? "",
-    file: event.filename ?? "",
+  Pulse.captureException(event.error ?? new Error(event.message), {
+    message: "worker_failed",
+    attributes: { worker: "parser" },
   });
 };
 worker.onmessageerror = () => Pulse.error("worker_message_failed", { worker: "parser" });
 ```
+
+The worker fallback wraps only the known message when no original error is available,
+so the fixed `worker_failed` event name does not discard its diagnostic text. Shared
+redaction still applies to the extracted stack.
 
 Inside the worker, catch and `postMessage` a structured failure to the page rather than
 trying to configure a second SDK instance there.
@@ -260,9 +285,9 @@ problem across many issues, and the server's normalisation only strips the obvio
 (UUIDs, numbers, quoted strings).
 
 ```ts
-Pulse.error(err, `Failed to load order ${id}`);        // splits per order
-Pulse.error(err, "order_load_failed", { order_id: id }); // one issue, filterable
+Pulse.captureException(err, { message: "order_load_failed" });
 ```
 
-Always pass the error object rather than only its message: the extracted `_error_type` is
+Keep variable metadata in approved attributes, not interpolated messages. Pass the original
+error rather than only its message: the extracted `_error_type` is
 what keeps a `TypeError` and a `RangeError` with identical wording on separate issues.

@@ -101,7 +101,7 @@ Read the `pubky-pulse://guide` resource for the full tool surface.
 | Metric slug | kebab-case, created on the server first | `process-payment` |
 | Funnel slug and step | kebab-case, created on the server first | `onboarding`, `onboarding-email` |
 | Questionnaire slug | kebab-case, immutable after creation | `nps-q3` |
-| Screen name | native: PascalCase human name; web: URL path, tracked automatically | `Checkout`, `/checkout` |
+| Screen name | native: PascalCase human name; web: app-owned safe route template, tracked automatically | `Checkout`, `/users/[id]` |
 | Web `bundle_id` | a site identifier name, not a URL | `app.acme.com` |
 
 Rule of thumb: hyphens mean the name must exist on the server first; underscores

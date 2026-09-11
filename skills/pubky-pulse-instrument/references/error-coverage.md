@@ -45,24 +45,41 @@ Automatic: `window`'s `error` and `unhandledrejection` events only.
 try {
   await pay(order);
 } catch (err) {
-  Pulse.error(err instanceof Error ? err : new Error(String(err)), "checkout_failed", {
-    order_id: order.id,
+  Pulse.captureException(err, {
+    message: "checkout_failed",
+    attributes: { stage: "payment" },
   });
 }
 ```
 
-The `instanceof` guard matters: the `Error` overload is chosen only when the first
-argument is not a string, so a caught string would be read as a logger-style message
-and everything after it would land in the wrong argument.
+`captureException` accepts any thrown value, including strings and objects. It
+preserves the original value in the transient `beforeSend(event, hint)` hint for
+app-owned filtering or an allowlist of safe metadata fields. Do not serialize or
+spread `hint.originalException` into attributes. Put shared expected-error patterns
+in `ignoreErrors`; use `beforeSend` for application-specific policy.
+
+Report once at the existing shared query callback, boundary or final handling layer.
+The SDK deduplicates the same `Error` object, but that is a backstop: newly wrapped
+errors and primitive throws are not deduplicated. The coverage scanner cannot follow
+helper calls, so record centralized coverage as a justified site instead of adding a
+second report merely to make the scanner pass.
 
 ```ts
 const res = await fetch(url);
 if (!res.ok) {
-  Pulse.error(new Error(`HTTP ${res.status}`), "api_request_failed", {
-    route, status_code: String(res.status),
+  Pulse.captureException(new Error(`HTTP ${res.status}`), {
+    message: "api_request_failed",
+    attributes: { route: "/orders/[id]", status_code: String(res.status) },
   });
 }
 ```
+
+Keep route labels app-owned and free of identifiers. For automatic screen tracking,
+pass `screenNameForPath: createScreenNameMapper([...])` with the app’s supported
+route templates; unknown paths use `/unknown`. If fetch telemetry is useful,
+`networkTracking: { urlMode: "origin" }` omits paths as well as query and fragment.
+These options do not sanitize custom attributes, error text or manually supplied
+screen names; choose safe values there too.
 
 ## Node boundaries
 

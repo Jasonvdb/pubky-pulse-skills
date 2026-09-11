@@ -118,7 +118,7 @@ cannot run on because it needs `node:crypto`, `node:zlib` and `node:fs`.
 
 ## 2. Audit
 
-- [ ] `grep` for `Pulse.configure`, `pulse_client_` and `@synonymdev/pubky-pulse` — an
+- [ ] `rg` for `Pulse.init`, `Pulse.configure`, `pulse_client_` and `@synonymdev/pubky-pulse` — an
       existing integration gets extended, not replaced, and its naming convention wins.
 - [ ] Read the routing table, the screen or page list, and the public API surface.
 - [ ] Find the product's own vocabulary — its model names, the verbs in its routes.
@@ -126,7 +126,8 @@ cannot run on because it needs `node:crypto`, `node:zlib` and `node:fs`.
 - [ ] Take the baseline: `scripts/find-uninstrumented-catches.sh <repo root>` (bundled
       beside this skill) prints `{"total":N,"uninstrumented":[…]}` — every `catch`,
       `.catch(`, `onFailure`, `runCatching`, `Result.failure` and `case .failure` with
-      no `Pulse.error` in the following 8 lines. Only a Pulse receiver counts —
+      no `Pulse.error` or browser `Pulse.captureException` in the following 8 lines,
+      stopping at the next handling site. Only a Pulse receiver counts —
       `console.error` and `logger.error` leave a site uninstrumented. Record `total`
       and the uninstrumented count now, so step 8 has something to compare against.
 
@@ -163,7 +164,7 @@ Where to look, condensed:
 | Settings, permissions, feature flags | `setting_changed`, `permission_denied` |
 | Backend request handling | one `request_handled` with method, route, status, duration |
 | Backend jobs, queues, cron, webhooks | one summary event per run, with counts and duration |
-| Every failure path, everywhere | `Pulse.error(err, "<action>_failed", { … })` |
+| Every handled failure | web: `Pulse.captureException(err, { message: "<action>_failed", attributes: { … } })`; Node/native: `Pulse.error(err, "<action>_failed", { … })` |
 
 Read `references/where-to-instrument.md` when deciding what a specific app area
 deserves, and `references/tracking-plan-template.md` when drafting the plan — it has
@@ -294,6 +295,9 @@ give it that surface's plan rows as its input. The handoff is:
   commented out at its callsite
 - the Event, Metric, Funnel step and Error rows for that surface, with the
   `Where (file:symbol)` column intact
+- for web: app-owned route templates, expected-error patterns and approved metadata
+  fields; use the SDK’s `init`, `captureException`, `ignoreErrors`, `beforeSend` and
+  `createScreenNameMapper` instead of rebuilding these mechanisms in app helpers
 - for a web-plus-backend repository: `propagateSessionTo` on the browser side and the
   matching `X-Pulse-Session-Id` scoping on the server side, so one user's browser and
   server events land on a single session timeline
@@ -315,9 +319,13 @@ per platform, and the gap is where instrumentation usually falls short:
 Three rules hold on every platform. Pass the error object, not its message: the
 extracted `_error_type` is what keeps a decoding failure and a transport failure on
 separate issues. Keep the message a fixed snake_case template
-(`photo_upload_failed`) and put ids and URLs in attributes, because the message is the
+(`photo_upload_failed`) and put approved context in attributes, because the message is the
 grouping key and an interpolated one produces a new issue per occurrence. Report once,
-at the layer that handles the failure, not at every layer it passes through.
+at the layer that handles the failure, not at every layer it passes through. On web,
+prefer an existing shared query callback or error boundary when it already owns the
+failure. Pass unknown caught values directly to `captureException`; let shared
+`ignoreErrors` and `beforeSend` policy filter and enrich them. The coverage scanner
+is a heuristic: document centralized reporting when it cannot follow the call path.
 
 Read `references/error-coverage.md` when a boundary is not a plain `catch` — it has the
 code shape for each boundary on each platform, and the report-or-skip judgement calls.
@@ -357,7 +365,7 @@ nothing at all.
 Nothing arriving is almost always one of eight things, in this order: the web app's
 `allowed_origins` (a `403` on the ingest request), the wrong `data_mode`, a key with
 the wrong prefix or belonging to another app, an endpoint that already has a path on
-it, calls made before `configure()`, a server-rendered path where there is no
+it, calls made before initialization, a server-rendered path where there is no
 `window`, a process that exited before flushing, or a browser buffer that never
 reached its threshold. Read `references/verification.md` for the query recipes and the
 decision tree that separates them.
@@ -403,7 +411,7 @@ because none is configured.
 | Metric slug | kebab-case, created on the server first | `process-payment` |
 | Funnel slug and step | kebab-case, created on the server first | `onboarding`, `onboarding-email` |
 | Questionnaire slug | kebab-case, immutable after creation | `nps-q3` |
-| Screen name | native: PascalCase human name; web: URL path, tracked automatically | `Checkout`, `/checkout` |
+| Screen name | native: PascalCase human name; web: app-owned safe route template, tracked automatically | `Checkout`, `/users/[id]` |
 | Web `bundle_id` | a site identifier name, not a URL | `app.acme.com` |
 
 Rule of thumb: hyphens mean the name must exist on the server first; underscores
@@ -414,7 +422,7 @@ a naming convention, stay consistent with it.
 ## Gotchas
 
 - **A full-stack framework is two apps.** One project, `<Project> Web` and
-  `<Project> Backend`, two keys, two `configure()` calls.
+  `<Project> Backend`, two keys: browser `Pulse.init`, backend `Pulse.configure`.
 - **A new web app has no `allowed_origins`** and answers `403` to every browser
   request. This is the most common reason nothing arrives.
 - **The dev origin is its own entry.** `http://localhost:3000`,
@@ -472,10 +480,11 @@ a naming convention, stay consistent with it.
   belongs in a bundle, a `NEXT_PUBLIC_*` variable, or a committed file.
 - **A backend key must not carry a public prefix.** A `NEXT_PUBLIC_` backend key ships
   to browsers.
-- **Calls before `configure()` are dropped** with one console line, then silence.
-- **Re-`configure()` starts a new session.** React StrictMode doubles it in dev.
-- **Server rendering is a no-op with a valid config and a throw with an invalid one** —
-  a mistyped endpoint fails during server rendering, not in the browser.
+- **Web `captureException` is quiet before initialization or while disabled.** Inspect
+  the `Pulse.init` result to diagnose a missing key, SSR or invalid configuration.
+- **Web `init` keeps the first successful configuration.** Repeated React effects
+  retain one session. Strict `configure()` still replaces configuration and can
+  throw during SSR; use `init` for optional browser setup.
 - **The endpoint takes no path.** The SDK appends `/v1/ingest` itself.
 - **Never log in a loop, a render pass, a scroll or timer callback, or per retry.**
   Emit one summary event with counts and `duration_ms` instead.

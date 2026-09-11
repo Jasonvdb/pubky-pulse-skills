@@ -24,7 +24,7 @@ question is already in the row.
 | Area | Events | Also |
 |---|---|---|
 | Launch, foreground, background | none — the SDK emits `sdk:session_started`, `sdk:app_foregrounded`, `sdk:app_backgrounded` | — |
-| Screens and navigation | none on web (History API is automatic); the screen modifier on Swift and Android | — |
+| Screens and navigation | none on web (History API is automatic; configure safe route templates); the screen modifier on Swift and Android | — |
 | Sign-up | `signed_up` (`method`, `referrer`), `sign_up_failed` (`reason`) | funnel `onboarding` |
 | Sign-in / sign-out | `signed_in` (`method`), `sign_in_failed` (`reason`), `signed_out` | metric `sign-in` if it calls out |
 | Email or phone verification | `verification_sent`, `verification_completed`, `verification_failed` | funnel step `onboarding-verify` |
@@ -43,7 +43,7 @@ question is already in the row.
 | Offline and connectivity | `sync_completed` (`pending_count`, `duration_ms`), `sync_failed` | metric `sync` |
 | Background refresh | one summary event per run, never one per item | metric |
 | In-app help and feedback | `Pulse.sendFeedback` on web, the SDK's feedback view on Swift and Android | — |
-| Errors anywhere | `Pulse.error(err, "<action>_failed", { … })` | — |
+| Errors anywhere | web: `Pulse.captureException(err, { message: "<action>_failed", attributes: { … } })`; native: `Pulse.error(err, "<action>_failed", { … })` | — |
 
 ## Backend service areas
 
@@ -67,10 +67,10 @@ question is already in the row.
 
 | Concern | Web | Node | Swift | Android |
 |---|---|---|---|---|
-| Configure | root component effect, root layout provider, or `onMount` | one module every entry point imports | `App.init` or `didFinishLaunchingWithOptions` | `Application.onCreate()` |
-| Screens | automatic; `trackScreen` for modals and wizard steps | n/a | `.pulseScreen("Name")` on each screen's outermost view | `Modifier.pulseScreen("Name")` on each screen's root composable |
+| Configure | `Pulse.init` in the browser entry point, root effect/provider or `onMount` | one module every entry point imports | `App.init` or `didFinishLaunchingWithOptions` | `Application.onCreate()` |
+| Screens | automatic with `createScreenNameMapper` app-owned templates; safe fixed `trackScreen` labels for modals and wizard steps | n/a | `.pulseScreen("Name")` on each screen's outermost view | `Modifier.pulseScreen("Name")` on each screen's root composable |
 | Outcome events | the success branch of the handler that did the work | after the work, before the response is sent | the success branch, on the main actor or off it | the success branch, inside the coroutine |
-| Errors | `catch`, error boundary, router error element | framework error handler, worker body | `catch`, `Result` failure, `Task` body | `catch`, `onFailure`, `CoroutineExceptionHandler` |
+| Errors | `captureException` at the shared handling boundary, router error element or final `catch` | framework error handler, worker body | `catch`, `Result` failure, `Task` body | `catch`, `onFailure`, `CoroutineExceptionHandler` |
 | Metrics | around the async call, terminal call on every exit | on the scoped logger, so phases carry the user | around the `async` function body | around the suspend function body |
 | Funnel steps | at the UI progression point | from `withUser(id)`, never the global logger, so only once identity is opted in | at the UI progression point | at the UI progression point |
 | Identity | `void Pulse.setUser(id)` after sign-in | `withUser(id)` per request, from the auth layer | `Pulse.setUser(id)` after sign-in | `Pulse.setUser(id)` after sign-in |

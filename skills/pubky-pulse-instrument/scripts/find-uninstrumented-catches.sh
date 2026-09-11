@@ -2,10 +2,9 @@
 # find-uninstrumented-catches.sh — list error-handling sites that report nothing.
 #
 # Neither the Swift nor the Android SDK captures crashes, and the web and Node
-# SDKs only capture what nobody caught. So every `catch` that does not call
-# Pulse.error is a failure the issue tracker will never see. This finds them, so
-# "catch every error" can be measured before and after instrumenting rather than
-# eyeballed.
+# SDKs only capture what nobody caught. Find handling sites without a local
+# Pulse.error or browser Pulse.captureException report. This is a heuristic:
+# shared reporting helpers and intentional skips need manual review.
 #
 # POSIX sh, grep/awk only. Read-only. JSON on stdout, diagnostics on stderr.
 
@@ -18,13 +17,16 @@ Usage: find-uninstrumented-catches.sh <root> [--window N] [--lang ts,swift,kt]
        find-uninstrumented-catches.sh --help
 
 Finds error-handling sites (catch, .catch(, onFailure, runCatching,
-Result.failure, case .failure) that have no Pulse.error call on the same line or
+Result.failure, case .failure) that have no Pulse.error or Pulse.captureException
+call on the same line or
 within the next N lines. The forward search stops at the next error-handling
 site, so a report belonging to a later handler never covers an earlier one.
 
 Only a Pulse receiver counts as a report: `Pulse.error(`, `pulse.error(`, and a
 scoped receiver whose token is `pulse` or ends in `Pulse` (`req.pulse.error(`,
-`scopedPulse.error(`). `console.error`, `logger.error`, `log.error`, `Log.error`
+`scopedPulse.error(`), or `.captureException(` on those receivers. Calls through
+other reporting helpers need manual review. `console.error`, `logger.error`,
+`logger.captureException`, `log.error`, `Log.error`
 and `Timber.e` are not captured by any SDK, so a catch that only logs is still
 reported as uninstrumented.
 
@@ -79,7 +81,8 @@ scan() {
       return (s ~ /(^|[^A-Za-z0-9_.])catch([^A-Za-z0-9_]|$)|\.catch\(|onFailure|runCatching|Result\.failure|case[ \t]+\.failure/)
     }
     function is_report(s) {
-      return (s ~ /(^|[^A-Za-z0-9_])(pulse|[A-Za-z0-9_]*Pulse)\.error\(/)
+      if (s ~ /^[ \t]*(\/\/|\*|\/\*|#)/) return 0
+      return (s ~ /(^|[^A-Za-z0-9_])(pulse|[A-Za-z0-9_]*Pulse)\.(error|captureException)\(/)
     }
     BEGIN {
       total = 0
@@ -94,8 +97,8 @@ scan() {
           reported = is_report(L[i])
           # Stop at the next handling site: its report covers itself, not this one.
           for (j = i + 1; !reported && j <= n && j <= i + window; j++) {
-            if (is_report(L[j])) { reported = 1; break }
             if (is_site(L[j])) break
+            if (is_report(L[j])) { reported = 1; break }
           }
           if (reported) continue
           snippet = trim(L[i])
@@ -193,6 +196,35 @@ export async function refresh() {
 }
 FIXTURE
 
+  cat >"$st_dir/src/captured.ts" <<'FIXTURE'
+try { throw "failed"; } catch (err) {
+  Pulse.captureException(err, { message: "load_failed" });
+}
+await send().catch((err) => pulse.captureException(err));
+try { work(); } catch (err) {
+  scopedPulse.captureException(err);
+}
+try { work(); } catch (err) {
+  req.pulse.captureException(err);
+}
+FIXTURE
+
+  cat >"$st_dir/src/other-capture.ts" <<'FIXTURE'
+try { work(); } catch (err) {
+  logger.captureException(err);
+}
+try { work(); } catch (err) {
+  // Pulse.captureException(err);
+}
+FIXTURE
+
+  cat >"$st_dir/src/adjacent-inline.ts" <<'FIXTURE'
+try { work(); } catch (err) {
+  showToast("failed");
+}
+await send().catch((err) => Pulse.captureException(err));
+FIXTURE
+
   cat >"$st_dir/node_modules/vendor.ts" <<'FIXTURE'
 try { a(); } catch (e) { ignore(e); }
 FIXTURE
@@ -201,13 +233,11 @@ FIXTURE
   rm -rf "$st_dir"
 
   st_status=0
-  # Ten sites: bad.ts catch, good.ts catch, good.ts .catch(, Repo.kt runCatching,
-  # Repo.kt onFailure, View.swift case .failure, logged.ts catch, scoped.ts catch,
-  # and both catches in adjacent.ts. Five are unreported — bad.ts, both Kotlin
-  # sites, logged.ts, which only reaches console.error, and the first catch in
-  # adjacent.ts — and the Swift comment line is not a site at all.
-  echo "$st_out" | grep -q '"total":10' || {
-    echo "self-test: expected 10 sites, got: $st_out" >&2
+  # Eighteen sites: the original ten error-reporting cases, four captureException
+  # calls on Pulse receivers, two rejected reports (logger/comment), and two
+  # adjacent sites where the later report is inline. Eight are unreported.
+  echo "$st_out" | grep -q '"total":18' || {
+    echo "self-test: expected 18 sites, got: $st_out" >&2
     st_status=1
   }
   echo "$st_out" | grep -q '"file":"[^"]*bad\.ts","line":4' || {
@@ -241,6 +271,25 @@ FIXTURE
   case $st_out in
     *'adjacent.ts","line":9'*)
       echo "self-test: flagged the adjacent catch that reports on its own next line" >&2
+      st_status=1 ;;
+  esac
+
+  case $st_out in
+    *captured.ts*) echo "self-test: flagged a Pulse.captureException report" >&2; st_status=1 ;;
+  esac
+  for st_line in 1 4; do
+    echo "$st_out" | grep -q '"file":"[^"]*other-capture\.ts","line":'"$st_line"',' || {
+      echo "self-test: unrelated or commented capture must not cover line $st_line" >&2
+      st_status=1
+    }
+  done
+  echo "$st_out" | grep -q '"file":"[^"]*adjacent-inline\.ts","line":1,' || {
+    echo "self-test: a later inline handler must not cover the preceding catch" >&2
+    st_status=1
+  }
+  case $st_out in
+    *'adjacent-inline.ts","line":4,'*)
+      echo "self-test: flagged the inline handler that reports its own error" >&2
       st_status=1 ;;
   esac
 
